@@ -1,0 +1,112 @@
+local Die = require("objects/die")
+
+local function createDiceTypes()
+    return {
+        Die:new({
+            name = "Vanilla Die",
+            color = "black",
+            die_type = "vanilla",
+            ability_name = "None",
+            ability_desc = "A standard die with no special abilities.",
+        }),
+        Die:new({
+            name = "Weighted Die",
+            color = "blue",
+            die_type = "weighted",
+            ability_name = "Heavy Hitter",
+            ability_desc = "Higher chance to roll 4, 5, or 6.",
+            weights = { 0.5, 0.5, 0.8, 1.2, 1.5, 1.8 },
+            glow_color = { 0.3, 0.5, 1.0, 0.6 },
+        }),
+        Die:new({
+            name = "Glass Die",
+            color = "red",
+            die_type = "glass",
+            ability_name = "Fragile Fortune",
+            ability_desc = "Adds bonus +10 to score, but has a 20% chance to break (become vanilla).",
+            glow_color = { 1.0, 0.3, 0.3, 0.6 },
+            ability = function(self, context)
+                if context and context.scoring then
+                    context.bonus = (context.bonus or 0) + 10 + self.upgrade_level * 5
+                    if math.random() < 0.2 then
+                        self.die_type = "vanilla"
+                        self.ability = nil
+                        self.ability_name = "Broken"
+                        self.ability_desc = "This die has shattered."
+                        self.glow_color = nil
+                        self.name = "Broken Die"
+                        return "broke"
+                    end
+                end
+                return "bonus"
+            end,
+        }),
+        Die:new({
+            name = "Odd Die",
+            color = "green",
+            die_type = "odd",
+            ability_name = "Odd Synergy",
+            ability_desc = "If value is odd, adds +5 to score.",
+            glow_color = { 0.2, 0.8, 0.3, 0.6 },
+            ability = function(self, context)
+                if context and context.scoring and self.value % 2 == 1 then
+                    context.bonus = (context.bonus or 0) + 5 + self.upgrade_level * 3
+                    return "odd_bonus"
+                end
+            end,
+        }),
+        Die:new({
+            name = "Even Die",
+            color = "green",
+            die_type = "even",
+            ability_name = "Even Synergy",
+            ability_desc = "If value is even, adds +5 to score.",
+            glow_color = { 0.2, 0.8, 0.3, 0.6 },
+            ability = function(self, context)
+                if context and context.scoring and self.value % 2 == 0 then
+                    context.bonus = (context.bonus or 0) + 5 + self.upgrade_level * 3
+                    return "even_bonus"
+                end
+            end,
+        }),
+        Die:new({
+            name = "Wild Die",
+            color = "red",
+            die_type = "wild",
+            ability_name = "Wild Card",
+            ability_desc = "Choose its value once per round (click to set).",
+            glow_color = { 1.0, 0.84, 0.0, 0.6 },
+        }),
+        Die:new({
+            name = "Mirror Die",
+            color = "blue",
+            die_type = "mirror",
+            ability_name = "Reflection",
+            ability_desc = "Flips value after rolling (1↔6, 2↔5, 3↔4).",
+            glow_color = { 0.5, 0.3, 0.9, 0.6 },
+        }),
+        Die:new({
+            name = "Echo Die",
+            color = "blue",
+            die_type = "echo",
+            ability_name = "Echo",
+            ability_desc = "Copies another die's value after rolling.",
+            glow_color = { 0.3, 0.7, 0.9, 0.6 },
+            ability = function(self, context)
+                if context and context.dice_pool and #context.dice_pool > 1 then
+                    local others = {}
+                    for _, d in ipairs(context.dice_pool) do
+                        if d ~= self then table.insert(others, d) end
+                    end
+                    if #others > 0 then
+                        local target = others[math.random(1, #others)]
+                        self.value = target.value
+                        return "echo"
+                    end
+                end
+            end,
+        }),
+    }
+end
+
+return createDiceTypes

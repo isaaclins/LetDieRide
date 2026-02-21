@@ -1,3 +1,2 @@
-love.window.setIcon(love.image.newImageData("content/icon/icon.png"))
-love.window.setTitle("Dice X Balatro")
-love.window.setMode(1280,720, { highdpi = true, resizable = true, minwidth = 100, minheight = 100 })
+-- Window settings are now handled in love.load() in main.lua
+-- This file is kept for backwards compatibility
