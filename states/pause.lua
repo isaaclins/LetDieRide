@@ -10,7 +10,7 @@ function Pause:draw()
     love.graphics.setColor(0, 0, 0, 0.65)
     love.graphics.rectangle("fill", 0, 0, W, H)
 
-    local panel_w, panel_h = 320, 300
+    local panel_w, panel_h = 320, 370
     local px = (W - panel_w) / 2
     local py = (H - panel_h) / 2
 
@@ -22,20 +22,25 @@ function Pause:draw()
 
     local btn_w, btn_h = 220, 48
     local btn_x = px + (panel_w - btn_w) / 2
-    local btn_y = py + 90
+    local btn_y = py + 84
 
     self._resume_hovered = UI.drawButton(
         "RESUME", btn_x, btn_y, btn_w, btn_h,
         { font = Fonts.get(22), color = UI.colors.green, hover_color = { 0.25, 0.85, 0.45, 1 } }
     )
 
+    self._settings_hovered = UI.drawButton(
+        "SETTINGS", btn_x, btn_y + 60, btn_w, btn_h,
+        { font = Fonts.get(22), color = UI.colors.accent, hover_color = { 1.0, 0.90, 0.20, 1 } }
+    )
+
     self._menu_hovered = UI.drawButton(
-        "SAVE & MENU", btn_x, btn_y + 64, btn_w, btn_h,
+        "SAVE & MENU", btn_x, btn_y + 120, btn_w, btn_h,
         { font = Fonts.get(22), color = UI.colors.blue }
     )
 
     self._exit_hovered = UI.drawButton(
-        "SAVE & EXIT", btn_x, btn_y + 128, btn_w, btn_h,
+        "SAVE & EXIT", btn_x, btn_y + 180, btn_w, btn_h,
         { font = Fonts.get(22), color = UI.colors.red, hover_color = { 0.95, 0.30, 0.30, 1 } }
     )
 
@@ -55,6 +60,8 @@ function Pause:mousepressed(x, y, button)
 
     if self._resume_hovered then
         return "resume"
+    elseif self._settings_hovered then
+        return "settings"
     elseif self._menu_hovered then
         return "save_and_menu"
     elseif self._exit_hovered then

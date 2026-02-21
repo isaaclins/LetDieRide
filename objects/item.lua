@@ -9,6 +9,7 @@ function Item:init(opts)
     self.trigger_type = opts.trigger_type or "passive"
     self.icon = opts.icon or "?"
     self.cost = opts.cost or 10
+    self.consumable = opts.consumable or false
     self.triggered_this_round = false
 end
 

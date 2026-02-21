@@ -187,17 +187,15 @@ function SaveLoad.restorePlayer(data, Player, Die, createDiceTypes, createItems,
 
     local base_hands = createHands()
     player.hands = {}
-    for i, hd in ipairs(data.hands or {}) do
-        local hand = base_hands[i]
-        if hand then
+    local saved_hands = data.hands or {}
+    for i, hand in ipairs(base_hands) do
+        local hd = saved_hands[i]
+        if hd then
             hand.base_score = hd.base_score or hand.base_score
             hand.multiplier = hd.multiplier or hand.multiplier
             hand.upgrade_level = hd.upgrade_level or 0
-            table.insert(player.hands, hand)
         end
-    end
-    if #player.hands == 0 then
-        player.hands = base_hands
+        table.insert(player.hands, hand)
     end
 
     local all_items = createItems()

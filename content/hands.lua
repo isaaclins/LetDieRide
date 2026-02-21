@@ -65,6 +65,55 @@ local function createHands()
             priority = 9,
             description = "All five dice the same value",
         }),
+        Hand:new({
+            name = "All Even",
+            base_score = 40,
+            multiplier = 3,
+            priority = 10,
+            description = "Every die shows an even value (2/4/6)",
+        }),
+        Hand:new({
+            name = "All Odd",
+            base_score = 40,
+            multiplier = 3,
+            priority = 11,
+            description = "Every die shows an odd value (1/3/5)",
+        }),
+        Hand:new({
+            name = "Three Pairs",
+            base_score = 50,
+            multiplier = 3,
+            priority = 12,
+            description = "Three different pairs (6+ dice)",
+        }),
+        Hand:new({
+            name = "Two Triplets",
+            base_score = 65,
+            multiplier = 4,
+            priority = 13,
+            description = "Two sets of three of a kind (6+ dice)",
+        }),
+        Hand:new({
+            name = "Full Run",
+            base_score = 80,
+            multiplier = 4.5,
+            priority = 14,
+            description = "All values 1-6 present (6+ dice)",
+        }),
+        Hand:new({
+            name = "Six of a Kind",
+            base_score = 130,
+            multiplier = 6,
+            priority = 15,
+            description = "Six dice of the same value",
+        }),
+        Hand:new({
+            name = "Seven of a Kind",
+            base_score = 175,
+            multiplier = 8,
+            priority = 16,
+            description = "Seven dice of the same value",
+        }),
     }
 end
 

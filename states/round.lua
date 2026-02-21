@@ -265,9 +265,11 @@ function Round:drawTopBar(player, boss, W)
 end
 
 function Round:drawDice(player, W, H)
-    local die_size = 110
-    local gap = 24
-    local total_w = #player.dice_pool * die_size + (#player.dice_pool - 1) * gap
+    local count = #player.dice_pool
+    local max_total = W * 0.75
+    local die_size = math.min(110, math.floor((max_total - (count - 1) * 12) / count))
+    local gap = math.min(24, math.floor((max_total - count * die_size) / math.max(count - 1, 1)))
+    local total_w = count * die_size + (count - 1) * gap
     local start_x = (W - total_w) / 2
     local die_y = H * 0.35
 
@@ -280,36 +282,109 @@ function Round:drawDice(player, W, H)
 
         UI.drawDie(dx, die_y, die_size, die.value, dot_color, nil, die.locked, hovered, die.glow_color)
 
-        love.graphics.setFont(Fonts.get(13))
+        local label_font = die_size >= 90 and 13 or (die_size >= 70 and 11 or 9)
+        love.graphics.setFont(Fonts.get(label_font))
         UI.setColor(UI.colors.text_dim)
-        love.graphics.printf(die.name, dx, die_y + die_size + 6, die_size, "center")
+        love.graphics.printf(die.name, dx - 4, die_y + die_size + 4, die_size + 8, "center")
 
         if die.ability_name ~= "None" and die.ability_name ~= "Broken" then
             UI.setColor(die.glow_color or UI.colors.accent_dim)
-            love.graphics.printf(die.ability_name, dx, die_y + die_size + 22, die_size, "center")
+            love.graphics.printf(die.ability_name, dx - 4, die_y + die_size + 4 + label_font + 2, die_size + 8, "center")
         end
     end
 end
+
+local hand_examples = {
+    ["High Roll"]       = { 6 },
+    ["Pair"]            = { 3, 3 },
+    ["Two Pair"]        = { 2, 2, 5, 5 },
+    ["Three of a Kind"] = { 4, 4, 4 },
+    ["Small Straight"]  = { 2, 3, 4, 5 },
+    ["Full House"]      = { 3, 3, 3, 6, 6 },
+    ["Large Straight"]  = { 1, 2, 3, 4, 5 },
+    ["Four of a Kind"]  = { 1, 1, 1, 1 },
+    ["Five of a Kind"]  = { 5, 5, 5, 5, 5 },
+    ["All Even"]        = { 2, 4, 6, 2, 4 },
+    ["All Odd"]         = { 1, 3, 5, 1, 3 },
+    ["Three Pairs"]     = { 1, 1, 3, 3, 5, 5 },
+    ["Two Triplets"]    = { 2, 2, 2, 5, 5, 5 },
+    ["Full Run"]        = { 1, 2, 3, 4, 5, 6 },
+    ["Six of a Kind"]   = { 3, 3, 3, 3, 3, 3 },
+    ["Seven of a Kind"] = { 6, 6, 6, 6, 6, 6, 6 },
+}
 
 function Round:drawHandReference(player, W, H)
     local panel_x = W - 230
     local panel_y = 70
     local panel_w = 220
-    local line_h = 22
+    local line_h = #player.hands > 12 and 18 or 22
+    local font_size = #player.hands > 12 and 11 or 13
     local panel_h = #player.hands * line_h + 20
 
     UI.drawPanel(panel_x, panel_y, panel_w, panel_h)
-    love.graphics.setFont(Fonts.get(13))
+    love.graphics.setFont(Fonts.get(font_size))
+
+    local mx, my = love.mouse.getPosition()
+    local hovered_hand = nil
 
     for i, hand in ipairs(player.hands) do
         local y = panel_y + 8 + (i - 1) * line_h
+        local is_hovered = UI.pointInRect(mx, my, panel_x, y, panel_w, line_h)
+
+        if is_hovered then
+            love.graphics.setColor(1, 1, 1, 0.05)
+            UI.roundRect("fill", panel_x + 4, y - 1, panel_w - 8, line_h, 3)
+            hovered_hand = hand
+        end
+
         if round_hand and hand.name == round_hand.name then
             UI.setColor(UI.colors.accent)
+        elseif is_hovered then
+            UI.setColor(UI.colors.text)
         else
             UI.setColor(UI.colors.text_dim)
         end
+        love.graphics.setFont(Fonts.get(font_size))
         love.graphics.print(hand.name, panel_x + 10, y)
         love.graphics.printf(hand:getDisplayScore(), panel_x, y, panel_w - 10, "right")
+    end
+
+    if hovered_hand then
+        self:drawHandTooltip(hovered_hand, panel_x, panel_y, panel_w, mx, my)
+    end
+end
+
+function Round:drawHandTooltip(hand, ref_x, ref_y, ref_w, mx, my)
+    local example = hand_examples[hand.name]
+    if not example then return end
+
+    local die_size = 28
+    local die_gap = 6
+    local dice_row_w = #example * die_size + (#example - 1) * die_gap
+    local pad = 12
+    local tip_w = math.max(dice_row_w + pad * 2, 160)
+    local tip_h = die_size + pad * 2 + 36
+
+    local tip_x = ref_x - tip_w - 8
+    local tip_y = math.max(ref_y, math.min(my - tip_h / 2, love.graphics.getHeight() - tip_h - 10))
+
+    love.graphics.setColor(0.08, 0.08, 0.16, 0.95)
+    UI.roundRect("fill", tip_x, tip_y, tip_w, tip_h, 8)
+    UI.setColor(UI.colors.accent)
+    love.graphics.setLineWidth(1.5)
+    UI.roundRect("line", tip_x, tip_y, tip_w, tip_h, 8)
+    love.graphics.setLineWidth(1)
+
+    love.graphics.setFont(Fonts.get(12))
+    UI.setColor(UI.colors.accent)
+    love.graphics.printf(hand.name, tip_x, tip_y + 8, tip_w, "center")
+
+    local dice_x = tip_x + (tip_w - dice_row_w) / 2
+    local dice_y = tip_y + 28
+
+    for i, val in ipairs(example) do
+        local dx = dice_x + (i - 1) * (die_size + die_gap)
+        UI.drawDie(dx, dice_y, die_size, val, UI.colors.die_black)
     end
 end
 

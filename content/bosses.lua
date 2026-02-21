@@ -39,7 +39,7 @@ local function createBosses()
         }),
         Boss:new({
             name = "The Collector",
-            description = "Lose one random die after this round (replaced with Vanilla)",
+            description = "Lose one random die after this round (replaced with Normal)",
             icon = "?",
             modifier = function(self, context)
                 if context and context.player then
@@ -51,9 +51,9 @@ local function createBosses()
                     local Die = require("objects/die")
                     local idx = RNG.random(1, #context.player.dice_pool)
                     context.player.dice_pool[idx] = Die:new({
-                        name = "Vanilla Die",
+                        name = "Normal Die",
                         color = "black",
-                        die_type = "vanilla",
+                        die_type = "Normal",
                         ability_name = "None",
                     })
                     context.collector_active = false

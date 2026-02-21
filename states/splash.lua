@@ -74,8 +74,13 @@ function Splash:draw()
         { font = Fonts.get(26), color = UI.colors.green, hover_color = { 0.25, 0.85, 0.45, 1 } }
     )
 
+    self._settings_hovered = UI.drawButton(
+        "SETTINGS", btn_x, btn_y + 68, btn_w, btn_h,
+        { font = Fonts.get(26), color = UI.colors.accent, hover_color = { 1.0, 0.90, 0.20, 1 } }
+    )
+
     self._exit_hovered = UI.drawButton(
-        "EXIT", btn_x, btn_y + 68, btn_w, btn_h,
+        "EXIT", btn_x, btn_y + 136, btn_w, btn_h,
         { font = Fonts.get(26), color = UI.colors.red, hover_color = { 0.95, 0.30, 0.30, 1 } }
     )
 
@@ -90,6 +95,8 @@ function Splash:mousepressed(x, y, button)
             return "continue_game"
         elseif self._new_game_hovered then
             return "start_game"
+        elseif self._settings_hovered then
+            return "open_settings"
         elseif self._exit_hovered then
             return "exit"
         end

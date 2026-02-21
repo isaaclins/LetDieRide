@@ -52,28 +52,108 @@ end
 function Scoring.detectHand(values)
     local counts = Scoring.getCounts(values)
     local sorted = Scoring.getSorted(values)
+    local n = #values
+
+    local max_count = 0
+    for _, count in pairs(counts) do
+        if count > max_count then max_count = count end
+    end
 
     local pairs_found = {}
     local threes_found = {}
     local fours_found = {}
-    local fives_found = {}
 
     for val, count in pairs(counts) do
-        if count == 2 then table.insert(pairs_found, val) end
-        if count == 3 then table.insert(threes_found, val) end
-        if count == 4 then table.insert(fours_found, val) end
-        if count == 5 then table.insert(fives_found, val) end
+        if count >= 2 then table.insert(pairs_found, val) end
+        if count >= 3 then table.insert(threes_found, val) end
+        if count >= 4 then table.insert(fours_found, val) end
     end
 
-    if #fives_found > 0 then
+    -- Seven of a Kind
+    if max_count >= 7 then
+        return "Seven of a Kind", values
+    end
+
+    -- Six of a Kind
+    if max_count >= 6 then
+        local matched = {}
+        for val, count in pairs(counts) do
+            if count >= 6 then
+                for i = 1, count do table.insert(matched, val) end
+            end
+        end
+        return "Six of a Kind", matched
+    end
+
+    -- Full Run: all values 1-6 present (need 6+ dice)
+    if n >= 6 then
+        local has_all = true
+        for v = 1, 6 do
+            if not counts[v] then has_all = false; break end
+        end
+        if has_all then
+            return "Full Run", { 1, 2, 3, 4, 5, 6 }
+        end
+    end
+
+    -- Five of a Kind
+    if max_count >= 5 then
         return "Five of a Kind", values
     end
 
+    -- Two Triplets: two different values each with count >= 3 (need 6+ dice)
+    if #threes_found >= 2 then
+        local matched = {}
+        local used = 0
+        for _, val in ipairs(threes_found) do
+            if used < 2 then
+                for i = 1, counts[val] do table.insert(matched, val) end
+                used = used + 1
+            end
+        end
+        return "Two Triplets", matched
+    end
+
+    -- All Even: every die is even (need 5+ dice)
+    if n >= 5 then
+        local all_even = true
+        for _, v in ipairs(values) do
+            if v % 2 ~= 0 then all_even = false; break end
+        end
+        if all_even then
+            return "All Even", values
+        end
+    end
+
+    -- All Odd: every die is odd (need 5+ dice)
+    if n >= 5 then
+        local all_odd = true
+        for _, v in ipairs(values) do
+            if v % 2 ~= 1 then all_odd = false; break end
+        end
+        if all_odd then
+            return "All Odd", values
+        end
+    end
+
+    -- Three Pairs: three different pairs (need 6+ dice)
+    if #pairs_found >= 3 then
+        local matched = {}
+        for _, val in ipairs(pairs_found) do
+            for i = 1, math.min(counts[val], 2) do
+                table.insert(matched, val)
+            end
+        end
+        return "Three Pairs", matched
+    end
+
+    -- Large Straight (5 consecutive)
     local has_large, large_matched = Scoring.hasConsecutive(sorted, 5)
     if has_large then
         return "Large Straight", large_matched
     end
 
+    -- Four of a Kind
     if #fours_found > 0 then
         local matched = {}
         for _, v in ipairs(values) do
@@ -82,15 +162,18 @@ function Scoring.detectHand(values)
         return "Four of a Kind", matched
     end
 
-    if #threes_found > 0 and #pairs_found > 0 then
+    -- Full House: three of a kind + a pair
+    if #threes_found > 0 and #pairs_found > 1 then
         return "Full House", values
     end
 
+    -- Small Straight (4 consecutive)
     local has_small, small_matched = Scoring.hasConsecutive(sorted, 4)
     if has_small then
         return "Small Straight", small_matched
     end
 
+    -- Three of a Kind
     if #threes_found > 0 then
         local matched = {}
         for _, v in ipairs(values) do
@@ -99,6 +182,7 @@ function Scoring.detectHand(values)
         return "Three of a Kind", matched
     end
 
+    -- Two Pair
     if #pairs_found >= 2 then
         local matched = {}
         for _, v in ipairs(values) do
@@ -112,6 +196,7 @@ function Scoring.detectHand(values)
         return "Two Pair", matched
     end
 
+    -- Pair
     if #pairs_found == 1 then
         local matched = {}
         for _, v in ipairs(values) do
@@ -120,6 +205,7 @@ function Scoring.detectHand(values)
         return "Pair", matched
     end
 
+    -- High Roll (fallback)
     return "High Roll", { math.max(unpack(values)) }
 end
 

@@ -71,9 +71,11 @@ function ShopState:drawHeader(player, W)
 end
 
 function ShopState:drawPlayerDice(player, W, H)
-    local die_size = 60
-    local gap = 12
-    local total = #player.dice_pool * die_size + (#player.dice_pool - 1) * gap
+    local count = #player.dice_pool
+    local max_total = W * 0.7
+    local die_size = math.min(60, math.floor((max_total - (count - 1) * 8) / count))
+    local gap = math.min(12, math.floor((max_total - count * die_size) / math.max(count - 1, 1)))
+    local total = count * die_size + (count - 1) * gap
     local start_x = (W - total) / 2
     local die_y = 72
 
@@ -282,7 +284,12 @@ function ShopState:drawDieReplaceOverlay(player, W, H)
     love.graphics.setColor(0, 0, 0, 0.7)
     love.graphics.rectangle("fill", 0, 0, W, H)
 
-    local panel_w, panel_h = 500, 180
+    local count = #player.dice_pool
+    local die_size = math.min(65, math.floor((W * 0.55 - (count - 1) * 10) / count))
+    local gap = math.min(16, math.floor(die_size * 0.2))
+    local total = count * die_size + (count - 1) * gap
+    local panel_w = math.max(500, total + 60)
+    local panel_h = die_size + 120
     local px = (W - panel_w) / 2
     local py = (H - panel_h) / 2
 
@@ -292,11 +299,8 @@ function ShopState:drawDieReplaceOverlay(player, W, H)
     UI.setColor(UI.colors.text)
     love.graphics.printf("Replace which die?", px, py + 15, panel_w, "center")
 
-    local die_size = 65
-    local gap = 16
-    local total = #player.dice_pool * die_size + (#player.dice_pool - 1) * gap
     local start_x = px + (panel_w - total) / 2
-    local die_y = py + 55
+    local die_y = py + 50
 
     local mx, my = love.mouse.getPosition()
     self._replace_die_buttons = {}

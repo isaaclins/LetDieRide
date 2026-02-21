@@ -4,7 +4,7 @@ local Die = Class:extend()
 
 function Die:init(opts)
     opts = opts or {}
-    self.name = opts.name or "Vanilla Die"
+    self.name = opts.name or "Normal Die"
     self.color = opts.color or "black"
     self.value = opts.value or 1
     self.locked = false
@@ -13,7 +13,7 @@ function Die:init(opts)
     self.ability_desc = opts.ability_desc or ""
     self.upgrade_level = opts.upgrade_level or 0
     self.max_upgrade = opts.max_upgrade or 3
-    self.die_type = opts.die_type or "vanilla"
+    self.die_type = opts.die_type or "Normal"
     self.roll_timer = 0
     self.rolling = false
     self.glow_color = opts.glow_color or nil

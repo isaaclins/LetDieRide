@@ -92,11 +92,35 @@ local function createItems()
             effect = function(self, context)
                 if context and context.phase == "round_start" and context.player then
                     for _, die in ipairs(context.player.dice_pool) do
-                        if die.die_type == "vanilla" then
+                        if die.die_type == "Normal" then
                             die.weights = { 0.8, 0.8, 1.0, 1.1, 1.2, 1.3 }
                         end
                     end
                 end
+            end,
+        }),
+        Item:new({
+            name = "Extra Die",
+            description = "Adds a Vanilla Die to your pool (max 10)",
+            icon = "D+",
+            cost = 25,
+            consumable = true,
+            trigger_type = "once",
+            effect = function(self, context)
+                if context and context.player then
+                    local Die = require("objects/die")
+                    if #context.player.dice_pool < 10 then
+                        table.insert(context.player.dice_pool, Die:new({
+                            name = "Vanilla Die",
+                            color = "black",
+                            die_type = "vanilla",
+                            ability_name = "None",
+                            ability_desc = "A standard die.",
+                        }))
+                        return true
+                    end
+                end
+                return false
             end,
         }),
     }

@@ -117,6 +117,16 @@ function Shop:buyItem(player, item_index)
         return false, "Not enough currency"
     end
 
+    if item.consumable then
+        local result = item.effect(item, { player = player })
+        if result == false then
+            return false, "Cannot use (pool full?)"
+        end
+        player.currency = player.currency - item.cost
+        table.remove(self.items_inventory, item_index)
+        return true, "Die added to pool!"
+    end
+
     player.currency = player.currency - item.cost
     player:addItem(item)
     table.remove(self.items_inventory, item_index)

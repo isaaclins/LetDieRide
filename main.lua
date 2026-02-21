@@ -6,6 +6,7 @@ local createItems = require("content/items")
 local createBosses = require("content/bosses")
 local SaveLoad = require("functions/saveload")
 local RNG = require("functions/rng")
+local Settings = require("functions/settings")
 
 local Splash = require("states/splash")
 local SeedInput = require("states/seed_input")
@@ -13,15 +14,34 @@ local RoundState = require("states/round")
 local ShopState = require("states/shop_state")
 local GameOverState = require("states/game_over")
 local PauseState = require("states/pause")
+local SettingsState = require("states/settings")
 
 local state = "splash"
 local paused = false
+local unfocused = false
 local player = nil
 local all_dice_types = nil
 local all_items = nil
 local all_bosses = nil
 local current_boss = nil
 local current_seed = ""
+local music = nil
+
+local function applyMusicVolume()
+    if not music then return end
+    local vol = Settings.get("music_volume") * Settings.get("master_volume")
+    music:setVolume(vol)
+end
+
+local function applyMuffle()
+    if not music then return end
+    music:setFilter({ type = "lowpass", highgain = 0.03, volume = 0.45 })
+end
+
+local function clearMuffle()
+    if not music then return end
+    music:setFilter()
+end
 
 local function saveGame()
     if player and (state == "round" or state == "shop") then
@@ -45,9 +65,9 @@ local function initNewGame(seed)
 
     for i = 1, 5 do
         table.insert(player.dice_pool, Die:new({
-            name = "Vanilla Die",
+            name = "Normal Die",
             color = "black",
-            die_type = "vanilla",
+            die_type = "Normal",
             ability_name = "None",
             ability_desc = "A standard die.",
         }))
@@ -106,6 +126,8 @@ function love.load()
     local default_font = love.graphics.newFont(16)
     love.graphics.setFont(default_font)
 
+    Settings.load()
+
     love.window.setIcon(love.image.newImageData("content/icon/icon.png"))
     love.window.setTitle("Dice × Balatro")
     love.window.setMode(1280, 720, {
@@ -115,19 +137,50 @@ function love.load()
         minheight = 540,
     })
 
+    music = love.audio.newSource("content/sfx/music.mp3", "stream")
+    music:setLooping(true)
+    applyMusicVolume()
+    music:play()
+
     _G.game_save_hook = saveGame
     require("functions/window")
 
     Splash:init()
 end
 
+function love.focus(f)
+    if not f then
+        unfocused = true
+        if _G.game_save_hook then _G.game_save_hook() end
+        if Settings.get("pause_on_unfocus") and music then
+            music:pause()
+        end
+    else
+        unfocused = false
+        if music and not music:isPlaying() then
+            music:play()
+        end
+    end
+end
+
+function love.quit()
+    if _G.game_save_hook then _G.game_save_hook() end
+    Settings.save()
+    print("Thanks for playing! Come back soon!")
+end
+
 function love.update(dt)
-    if paused then return end
+    if unfocused and Settings.get("pause_on_unfocus") then return end
+    if paused and state ~= "settings" then return end
+
+    applyMusicVolume()
 
     if state == "splash" then
         Splash:update(dt)
     elseif state == "seed_input" then
         SeedInput:update(dt)
+    elseif state == "settings" then
+        SettingsState:update(dt)
     elseif state == "round" then
         RoundState:update(dt, player)
     elseif state == "shop" then
@@ -142,6 +195,15 @@ function love.draw()
         Splash:draw()
     elseif state == "seed_input" then
         SeedInput:draw()
+    elseif state == "settings" then
+        if SettingsState._from_state == "pause" then
+            if SettingsState._game_draw == "round" then
+                RoundState:draw(player, current_boss)
+            elseif SettingsState._game_draw == "shop" then
+                ShopState:draw(player)
+            end
+        end
+        SettingsState:draw()
     elseif state == "round" then
         RoundState:draw(player, current_boss)
     elseif state == "shop" then
@@ -150,12 +212,25 @@ function love.draw()
         GameOverState:draw(player)
     end
 
-    if paused then
+    if paused and state ~= "settings" then
         PauseState:draw()
+    end
+
+    if unfocused and Settings.get("pause_on_unfocus") then
+        love.graphics.setColor(0, 0, 0, 0.6)
+        love.graphics.rectangle("fill", 0, 0, love.graphics.getDimensions())
     end
 end
 
 function love.mousepressed(x, y, button)
+    if unfocused and Settings.get("pause_on_unfocus") then return end
+
+    if state == "settings" then
+        local result = SettingsState:mousepressed(x, y, button)
+        handleResult(result)
+        return
+    end
+
     if paused then
         local result = PauseState:mousepressed(x, y, button)
         handlePauseResult(result)
@@ -179,7 +254,21 @@ function love.mousepressed(x, y, button)
     handleResult(result)
 end
 
+function love.mousereleased(x, y, button)
+    if state == "settings" then
+        SettingsState:mousereleased(x, y, button)
+    end
+end
+
 function love.keypressed(key)
+    if unfocused and Settings.get("pause_on_unfocus") then return end
+
+    if state == "settings" then
+        local result = SettingsState:keypressed(key)
+        handleResult(result)
+        return
+    end
+
     if paused then
         local result = PauseState:keypressed(key)
         handlePauseResult(result)
@@ -207,6 +296,7 @@ function love.keypressed(key)
 
     if key == "escape" and (state == "round" or state == "shop") then
         paused = true
+        applyMuffle()
         return
     end
 end
@@ -222,9 +312,16 @@ function handlePauseResult(result)
 
     if result == "resume" then
         paused = false
+        clearMuffle()
+    elseif result == "settings" then
+        SettingsState._from_state = "pause"
+        SettingsState._game_draw = state
+        state = "settings"
+        SettingsState:init({ from_pause = true })
     elseif result == "save_and_menu" then
         saveGame()
         paused = false
+        clearMuffle()
         state = "splash"
         Splash:init()
     elseif result == "save_and_exit" then
@@ -249,6 +346,20 @@ function handleResult(result)
         if not loadGame() then
             state = "seed_input"
             SeedInput:init()
+        end
+    elseif result == "open_settings" then
+        SettingsState._from_state = "splash"
+        SettingsState._game_draw = nil
+        state = "settings"
+        SettingsState:init({ from_pause = false })
+    elseif result == "settings_back" then
+        applyMusicVolume()
+        if SettingsState._from_state == "pause" then
+            state = SettingsState._game_draw or "round"
+            paused = true
+        else
+            state = "splash"
+            Splash:init()
         end
     elseif result == "exit" then
         love.event.quit()

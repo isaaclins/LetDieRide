@@ -4,9 +4,9 @@ local RNG = require("functions/rng")
 local function createDiceTypes()
     return {
         Die:new({
-            name = "Vanilla Die",
+            name = "Normal Die",
             color = "black",
-            die_type = "vanilla",
+            die_type = "Normal",
             ability_name = "None",
             ability_desc = "A standard die with no special abilities.",
         }),
@@ -24,13 +24,13 @@ local function createDiceTypes()
             color = "red",
             die_type = "glass",
             ability_name = "Fragile Fortune",
-            ability_desc = "Adds bonus +10 to score, but has a 20% chance to break (become vanilla).",
+            ability_desc = "Adds bonus +10 to score, but has a 20% chance to break (become Normal).",
             glow_color = { 1.0, 0.3, 0.3, 0.6 },
             ability = function(self, context)
                 if context and context.scoring then
                     context.bonus = (context.bonus or 0) + 10 + self.upgrade_level * 5
                     if RNG.random() < 0.2 then
-                        self.die_type = "vanilla"
+                        self.die_type = "Normal"
                         self.ability = nil
                         self.ability_name = "Broken"
                         self.ability_desc = "This die has shattered."
