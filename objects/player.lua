@@ -124,8 +124,9 @@ function Player:getTargetScore()
     return math.floor(base * (scaling ^ (self.round - 1)))
 end
 
-function Player:earnCurrency(score)
-    local earned = math.max(5, math.floor(score / 8))
+function Player:earnCurrency()
+    local target = self:getTargetScore()
+    local earned = math.max(5, math.floor(target / 8))
     self.currency = self.currency + earned
     return earned
 end

@@ -264,32 +264,58 @@ function Round:drawTopBar(player, boss, W)
     end
 end
 
+local function getDiceLayout(count, W, H)
+    local left_margin = 240
+    local right_margin = 240
+    local avail_w = W - left_margin - right_margin
+
+    local die_size = math.min(110, math.max(60, math.floor(avail_w / math.min(count, 6)) - 16))
+    local gap = math.min(16, math.max(8, math.floor((avail_w - die_size * math.min(count, 6)) / math.max(math.min(count, 6) - 1, 1))))
+
+    local per_row = math.max(1, math.floor((avail_w + gap) / (die_size + gap)))
+    local rows = math.ceil(count / per_row)
+    local label_font = die_size >= 90 and 13 or (die_size >= 70 and 11 or 9)
+    local row_h = die_size + label_font + 22
+    local base_y = H * 0.35 - (rows - 1) * row_h / 2
+
+    return {
+        die_size = die_size, gap = gap, per_row = per_row,
+        rows = rows, label_font = label_font, row_h = row_h,
+        base_y = base_y, left_margin = left_margin, avail_w = avail_w,
+    }
+end
+
+local function getDiePosition(layout, i, count)
+    local row = math.floor((i - 1) / layout.per_row)
+    local col = (i - 1) % layout.per_row
+    local items_in_row = math.min(layout.per_row, count - row * layout.per_row)
+    local row_w = items_in_row * layout.die_size + (items_in_row - 1) * layout.gap
+    local row_x = layout.left_margin + (layout.avail_w - row_w) / 2
+    local dx = row_x + col * (layout.die_size + layout.gap)
+    local dy = layout.base_y + row * layout.row_h
+    return dx, dy
+end
+
 function Round:drawDice(player, W, H)
     local count = #player.dice_pool
-    local max_total = W * 0.75
-    local die_size = math.min(110, math.floor((max_total - (count - 1) * 12) / count))
-    local gap = math.min(24, math.floor((max_total - count * die_size) / math.max(count - 1, 1)))
-    local total_w = count * die_size + (count - 1) * gap
-    local start_x = (W - total_w) / 2
-    local die_y = H * 0.35
+    local layout = getDiceLayout(count, W, H)
 
     local mx, my = love.mouse.getPosition()
 
     for i, die in ipairs(player.dice_pool) do
-        local dx = start_x + (i - 1) * (die_size + gap)
-        local hovered = UI.pointInRect(mx, my, dx, die_y, die_size, die_size)
+        local dx, dy = getDiePosition(layout, i, count)
+        local hovered = UI.pointInRect(mx, my, dx, dy, layout.die_size, layout.die_size)
         local dot_color = die_colors_map[die.color] or UI.colors.die_black
 
-        UI.drawDie(dx, die_y, die_size, die.value, dot_color, nil, die.locked, hovered, die.glow_color)
+        UI.drawDie(dx, dy, layout.die_size, die.value, dot_color, nil, die.locked, hovered, die.glow_color)
 
-        local label_font = die_size >= 90 and 13 or (die_size >= 70 and 11 or 9)
-        love.graphics.setFont(Fonts.get(label_font))
+        love.graphics.setFont(Fonts.get(layout.label_font))
         UI.setColor(UI.colors.text_dim)
-        love.graphics.printf(die.name, dx - 4, die_y + die_size + 4, die_size + 8, "center")
+        love.graphics.printf(die.name, dx - 4, dy + layout.die_size + 4, layout.die_size + 8, "center")
 
         if die.ability_name ~= "None" and die.ability_name ~= "Broken" then
             UI.setColor(die.glow_color or UI.colors.accent_dim)
-            love.graphics.printf(die.ability_name, dx - 4, die_y + die_size + 4 + label_font + 2, die_size + 8, "center")
+            love.graphics.printf(die.ability_name, dx - 4, dy + layout.die_size + 4 + layout.label_font + 2, layout.die_size + 8, "center")
         end
     end
 end
@@ -593,15 +619,12 @@ function Round:mousepressed(x, y, button, player)
 
     if sub_state == "choosing" then
         local W, H = love.graphics.getDimensions()
-        local die_size = 110
-        local gap = 24
-        local total_w = #player.dice_pool * die_size + (#player.dice_pool - 1) * gap
-        local start_x = (W - total_w) / 2
-        local die_y = H * 0.35
+        local count = #player.dice_pool
+        local layout = getDiceLayout(count, W, H)
 
         for i, die in ipairs(player.dice_pool) do
-            local dx = start_x + (i - 1) * (die_size + gap)
-            if UI.pointInRect(x, y, dx, die_y, die_size, die_size) then
+            local dx, dy = getDiePosition(layout, i, count)
+            if UI.pointInRect(x, y, dx, dy, layout.die_size, layout.die_size) then
                 if boss_context and boss_context.locked_by_boss == i then
                     message = "Boss locked this die!"
                     message_timer = 1.5
@@ -632,7 +655,7 @@ function Round:mousepressed(x, y, button, player)
             score_display_timer = 0
 
             if score >= player:getTargetScore() then
-                currency_earned = player:earnCurrency(score)
+                currency_earned = player:earnCurrency()
                 local earn_context = { player = player, phase = "earn" }
                 player:applyItems(earn_context)
             end
@@ -672,7 +695,7 @@ function Round:keypressed(key, player)
             sub_state = "scoring"
             score_display_timer = 0
             if score >= player:getTargetScore() then
-                currency_earned = player:earnCurrency(score)
+                currency_earned = player:earnCurrency()
                 local earn_context = { player = player, phase = "earn" }
                 player:applyItems(earn_context)
             end
