@@ -1,2 +1,0 @@
--- Window settings are now handled in love.load() in main.lua
--- This file is kept for backwards compatibility
