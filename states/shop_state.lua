@@ -5,6 +5,7 @@ local Tween = require("functions/tween")
 local Particles = require("functions/particles")
 local Toast = require("functions/toast")
 local Settings = require("functions/settings")
+local CoinAnim = require("functions/coin_anim")
 
 local ShopState = {}
 
@@ -146,7 +147,9 @@ function ShopState:drawHeader(player, W)
 
     currency_anim.display = currency_anim.display + (player.currency - currency_anim.display) * math.min(1, 8 * love.timer.getDelta())
     UI.setColor(UI.colors.green)
-    love.graphics.printf("$" .. math.floor(currency_anim.display + 0.5), 0, 22, W - 24, "right")
+    local hdr_font = love.graphics.getFont()
+    local hdr_cs = hdr_font:getHeight() / CoinAnim.getHeight()
+    CoinAnim.drawStaticWithAmount(tostring(math.floor(currency_anim.display + 0.5)), 0, 22, "right", W - 24, hdr_cs)
 
     if not shop.free_choice_used then
         UI.drawBadge("FREE CHOICE AVAILABLE", 24, 22, UI.colors.free_badge, Fonts.get(14), true)
@@ -224,7 +227,8 @@ function ShopState:drawPlayerDice(player, W, H)
         else
             UI.setColor(UI.colors.red)
         end
-        love.graphics.printf("$" .. cost, gx - 5, gy + die_size + 3, die_size + 10, "center")
+        local ghost_cs = Fonts.get(11):getHeight() / CoinAnim.getHeight()
+        CoinAnim.drawStaticWithAmount(tostring(cost), gx - 5, gy + die_size + 3, "center", die_size + 10, ghost_cs)
 
         self._ghost_die = { x = gx, y = gy, w = die_size, h = die_size, hovered = ghost_hovered, cost = cost }
 
@@ -341,7 +345,8 @@ function ShopState:drawShopHandReference(player, W, H)
                 else
                     love.graphics.setColor(UI.colors.red[1], UI.colors.red[2], UI.colors.red[3], sa.alpha)
                 end
-                love.graphics.printf("$" .. live_cost, card_x, text_top, card_w - 8, "right")
+                local huc = Fonts.get(14):getHeight() / CoinAnim.getHeight()
+                CoinAnim.drawStaticWithAmount(tostring(live_cost), card_x, text_top, "right", card_w - 8, huc)
             end
         elseif maxed then
             love.graphics.setFont(Fonts.get(12))
@@ -459,7 +464,8 @@ function ShopState:drawDiceSection(player, W, H)
         else
             UI.setColor(can_afford and UI.colors.accent or UI.colors.red)
             love.graphics.setFont(Fonts.get(14))
-            love.graphics.printf("$" .. entry.cost, item_x, iy + 8 + ch.lift, item_w - 8, "right")
+            local dcs = Fonts.get(14):getHeight() / CoinAnim.getHeight()
+            CoinAnim.drawStaticWithAmount(tostring(entry.cost), item_x, iy + 8 + ch.lift, "right", item_w - 8, dcs)
         end
 
         self._dice_buttons[i] = { x = item_x, y = iy, w = item_w, h = 72, hovered = hovered }
@@ -530,7 +536,8 @@ function ShopState:drawItemsSection(player, W, H)
 
         UI.setColor(can_afford and UI.colors.accent or UI.colors.red)
         love.graphics.setFont(Fonts.get(14))
-        love.graphics.printf("$" .. item.cost, item_x, iy + 8 + ch.lift, item_w - 8, "right")
+        local ics = Fonts.get(14):getHeight() / CoinAnim.getHeight()
+        CoinAnim.drawStaticWithAmount(tostring(item.cost), item_x, iy + 8 + ch.lift, "right", item_w - 8, ics)
 
         self._item_buttons[i] = { x = item_x, y = iy, w = item_w, h = 60, hovered = hovered }
 

@@ -2,6 +2,7 @@ local UI = require("functions/ui")
 local Fonts = require("functions/fonts")
 local Tween = require("functions/tween")
 local Particles = require("functions/particles")
+local CoinAnim = require("functions/coin_anim")
 
 local GameOver = {}
 
@@ -129,7 +130,22 @@ function GameOver:draw(player)
         local count_t = math.min(1, (time_elapsed - 1.4) / 0.5)
         local display_currency = math.floor(UI.lerp(0, player.currency, math.max(0, count_t)))
         love.graphics.setColor(1, 1, 1, sa2.alpha)
-        love.graphics.printf("Final Currency: $" .. display_currency, 0, stats_y + 36 + sa2.y_off, W, "center")
+        local fc_font = love.graphics.getFont()
+        local fc_label = "Final Currency: "
+        local fc_amount = tostring(display_currency)
+        local fc_cs = fc_font:getHeight() / CoinAnim.getHeight()
+        local fc_coin_w = CoinAnim.getWidth(fc_cs)
+        local fc_gap = math.max(1, math.floor(2 * fc_cs))
+        local fc_total_w = fc_font:getWidth(fc_label) + fc_coin_w + fc_gap + fc_font:getWidth(fc_amount)
+        local fc_x = (W - fc_total_w) / 2
+        local fc_y = stats_y + 36 + sa2.y_off
+        love.graphics.print(fc_label, fc_x, fc_y)
+        local fc_coin_x = fc_x + fc_font:getWidth(fc_label)
+        local fc_coin_y = fc_y + (fc_font:getHeight() - CoinAnim.getHeight(fc_cs)) / 2
+        love.graphics.setColor(1, 1, 1, sa2.alpha)
+        CoinAnim.drawStatic(fc_coin_x, fc_coin_y, fc_cs)
+        love.graphics.setColor(1, 1, 1, sa2.alpha)
+        love.graphics.print(fc_amount, fc_coin_x + fc_coin_w + fc_gap, fc_y)
     end
 
     local sa3 = stats_anims[3]

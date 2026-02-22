@@ -13,6 +13,7 @@ local Transition = require("functions/transition")
 local Toast = require("functions/toast")
 local Fonts = require("functions/fonts")
 local Updater = require("functions/updater")
+local CoinAnim = require("functions/coin_anim")
 
 local Splash = require("states/splash")
 local SeedInput = require("states/seed_input")
@@ -142,7 +143,7 @@ function love.load()
     Settings.load()
 
     love.window.setIcon(love.image.newImageData("content/icon/icon.png"))
-    love.window.setTitle("Dice × Balatro")
+    love.window.setTitle("Let Die Ride!")
     love.window.setMode(1280, 720, {
         highdpi = true,
         resizable = true,
@@ -154,6 +155,8 @@ function love.load()
     if Settings.get("fullscreen") then
         love.window.setFullscreen(true)
     end
+
+    CoinAnim.load()
 
     music = love.audio.newSource("content/sfx/music.mp3", "stream")
     music:setLooping(true)
@@ -193,6 +196,7 @@ function love.update(dt)
     Tween.update(dt)
     Particles.update(dt)
     Toast.update(dt)
+    CoinAnim.update(dt)
 
     if Updater.update() then
         Toast.info("New version available: v" .. Updater.getLatestVersion())

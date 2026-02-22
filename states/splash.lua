@@ -141,13 +141,13 @@ function Splash:draw()
     for dx = -3, 3 do
         for dy = -3, 3 do
             if dx ~= 0 or dy ~= 0 then
-                love.graphics.printf("DICE x BALATRO", dx - W / 2, dy - 32, W, "center")
+                love.graphics.printf("LET DIE RIDE!", dx - W / 2, dy - 32, W, "center")
             end
         end
     end
 
     love.graphics.setColor(1.0, 0.84, 0, title_anim.alpha)
-    love.graphics.printf("DICE x BALATRO", -W / 2, -32, W, "center")
+    love.graphics.printf("LET DIE RIDE!", -W / 2, -32, W, "center")
     love.graphics.pop()
 
     love.graphics.setFont(Fonts.get(22))

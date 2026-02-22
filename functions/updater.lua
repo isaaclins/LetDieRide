@@ -2,7 +2,7 @@ local GAME_VERSION = require("version")
 
 local Updater = {}
 
-local REPO = "isaaclins/mygame"
+local REPO = "isaaclins/letdieride"
 local API_URL = "https://api.github.com/repos/" .. REPO .. "/releases/latest"
 local RELEASES_URL = "https://github.com/" .. REPO .. "/releases"
 

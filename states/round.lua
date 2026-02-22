@@ -6,6 +6,7 @@ local Particles = require("functions/particles")
 local Toast = require("functions/toast")
 local Settings = require("functions/settings")
 local Tutorial = require("states/tutorial")
+local CoinAnim = require("functions/coin_anim")
 
 local Round = {}
 
@@ -392,7 +393,9 @@ function Round:drawTopBar(player, boss, W)
     love.graphics.printf("Target: " .. player:getTargetScore(), 0, 22, W * 0.5, "center")
 
     UI.setColor(UI.colors.green)
-    love.graphics.printf("$" .. player.currency, 0, 22, W - 24, "right")
+    local font = love.graphics.getFont()
+    local coin_scale = font:getHeight() / CoinAnim.getHeight()
+    CoinAnim.drawWithAmount(tostring(player.currency), 0, 22, "right", W - 24, coin_scale)
 
     local reroll_text = "Rerolls: " .. player.rerolls_remaining
     UI.setColor(UI.colors.text_dim)
@@ -864,25 +867,36 @@ function Round:drawPreRoll(player, W, H)
     love.graphics.setColor(0.04, 0.04, 0.08, overlay_alpha * 0.75)
     love.graphics.rectangle("fill", 0, 0, W, H)
 
+    local is_boss = player:isBossRound()
+    local panel_w = 420
+    local panel_h = is_boss and 180 or 130
+    local px = (W - panel_w) / 2
+    local py = H * 0.38 - panel_h / 2
+
     love.graphics.push()
-    love.graphics.translate(W / 2, H * 0.38)
+    love.graphics.translate(px + panel_w / 2, py + panel_h / 2)
     love.graphics.scale(pre_roll_anim.scale, pre_roll_anim.scale)
+    love.graphics.translate(-(px + panel_w / 2), -(py + panel_h / 2))
+
+    love.graphics.setColor(1, 1, 1, pre_roll_anim.alpha)
+    UI.drawPanel(px, py, panel_w, panel_h, { border = UI.colors.accent, border_width = 2 })
 
     love.graphics.setFont(Fonts.get(48))
     love.graphics.setColor(1, 1, 1, pre_roll_anim.alpha)
-    love.graphics.printf("Round " .. player.round, -W / 2, -24, W, "center")
-    love.graphics.pop()
+    love.graphics.printf("Round " .. player.round, px, py + 18, panel_w, "center")
 
     love.graphics.setFont(Fonts.get(24))
     love.graphics.setColor(UI.colors.accent[1], UI.colors.accent[2], UI.colors.accent[3], pre_roll_anim.alpha)
-    love.graphics.printf("Target: " .. pre_roll_anim.target_count, 0, H * 0.38 + 40, W, "center")
+    love.graphics.printf("Target: " .. pre_roll_anim.target_count, px, py + 78, panel_w, "center")
 
-    if player:isBossRound() then
+    if is_boss then
         local boss_flash = 0.7 + 0.3 * math.sin(love.timer.getTime() * 10)
         love.graphics.setColor(UI.colors.red[1], UI.colors.red[2], UI.colors.red[3], pre_roll_anim.alpha * boss_flash)
         love.graphics.setFont(Fonts.get(28))
-        love.graphics.printf("BOSS ROUND!", 0, H * 0.38 + 76, W, "center")
+        love.graphics.printf("BOSS ROUND!", px, py + 118, panel_w, "center")
     end
+
+    love.graphics.pop()
 end
 
 local function getScoringButtonDelay()
@@ -980,16 +994,19 @@ function Round:drawScoring(player, W, H)
                 local ly = line_y_start + (i - 1) * line_height + y_off
 
                 local label = entry.label
-                local amount_str = "+$" .. entry.amount
+                local amount_str = "+" .. entry.amount
+                local cs = line_font:getHeight() / CoinAnim.getHeight()
+                local coin_w = CoinAnim.getWidth(cs)
+                local gap = math.max(1, math.floor(2 * cs))
+                local amount_total_w = coin_w + gap + line_font:getWidth(amount_str)
 
                 love.graphics.setColor(UI.colors.text_dim[1], UI.colors.text_dim[2], UI.colors.text_dim[3], alpha)
                 love.graphics.printf(label, px + pad_x, ly, panel_w - pad_x * 2, "left")
 
                 local label_w = line_font:getWidth(label)
-                local amount_w = line_font:getWidth(amount_str)
                 local dot_w = line_font:getWidth(". ")
                 local dots_start_x = px + pad_x + label_w + 6
-                local dots_end_x = px + panel_w - pad_x - amount_w - 6
+                local dots_end_x = px + panel_w - pad_x - amount_total_w - 6
                 love.graphics.setColor(UI.colors.text_dark[1], UI.colors.text_dark[2], UI.colors.text_dark[3], alpha * 0.6)
                 local dot_x = dots_start_x
                 while dot_x + dot_w < dots_end_x do
@@ -998,7 +1015,7 @@ function Round:drawScoring(player, W, H)
                 end
 
                 love.graphics.setColor(UI.colors.accent[1], UI.colors.accent[2], UI.colors.accent[3], alpha)
-                love.graphics.printf(amount_str, px + pad_x, ly, panel_w - pad_x * 2, "right")
+                CoinAnim.drawStaticWithAmount(amount_str, px + pad_x, ly, "right", panel_w - pad_x * 2, cs)
             end
         end
 
@@ -1016,7 +1033,9 @@ function Round:drawScoring(player, W, H)
             love.graphics.setColor(UI.colors.text[1], UI.colors.text[2], UI.colors.text[3], total_alpha)
             love.graphics.printf("Total", px + pad_x, total_y, panel_w - pad_x * 2, "left")
             love.graphics.setColor(UI.colors.accent[1], UI.colors.accent[2], UI.colors.accent[3], total_alpha)
-            love.graphics.printf("$" .. currency_earned, px + pad_x, total_y, panel_w - pad_x * 2, "right")
+            local total_font = love.graphics.getFont()
+            local tcs = total_font:getHeight() / CoinAnim.getHeight()
+            CoinAnim.drawStaticWithAmount(tostring(currency_earned), px + pad_x, total_y, "right", panel_w - pad_x * 2, tcs)
         end
 
         if has_abilities then
