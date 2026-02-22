@@ -688,6 +688,16 @@ function Round:drawHandReference(player, W, H)
             hovered_hand = hand
         end
 
+        local name_x = panel_x + 10
+        if hand.upgrade_level and hand.upgrade_level > 0 then
+            local lv_tag = "[LV." .. hand.upgrade_level .. "] "
+            love.graphics.setFont(Fonts.get(font_size))
+            local tag_w = love.graphics.getFont():getWidth(lv_tag)
+            love.graphics.setColor(UI.colors.accent[1], UI.colors.accent[2], UI.colors.accent[3], hand_ref_anim.alpha)
+            love.graphics.print(lv_tag, name_x, y)
+            name_x = name_x + tag_w
+        end
+
         if round_hand and hand.name == round_hand.name then
             love.graphics.setColor(UI.colors.accent[1], UI.colors.accent[2], UI.colors.accent[3], hand_ref_anim.alpha)
         elseif is_hovered then
@@ -696,7 +706,7 @@ function Round:drawHandReference(player, W, H)
             love.graphics.setColor(UI.colors.text_dim[1], UI.colors.text_dim[2], UI.colors.text_dim[3], hand_ref_anim.alpha)
         end
         love.graphics.setFont(Fonts.get(font_size))
-        love.graphics.print(hand.name, panel_x + 10, y)
+        love.graphics.print(hand.name, name_x, y)
         love.graphics.printf(hand:getDisplayScore(), panel_x, y, panel_w - 10, "right")
     end
 
