@@ -9,6 +9,8 @@ local defaults = {
     screenshake = true,
     show_fps = false,
     vsync = true,
+    fullscreen = false,
+    dice_sort_mode = "default",
 }
 
 local current = {}

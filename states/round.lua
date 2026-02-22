@@ -4,8 +4,18 @@ local Fonts = require("functions/fonts")
 local Tween = require("functions/tween")
 local Particles = require("functions/particles")
 local Toast = require("functions/toast")
+local Settings = require("functions/settings")
 
 local Round = {}
+
+local sort_modes = {
+    { key = "default",    label = "Default" },
+    { key = "value_asc",  label = "Value ↑" },
+    { key = "value_desc", label = "Value ↓" },
+    { key = "type",       label = "Type" },
+    { key = "even_first", label = "Even 1st" },
+    { key = "odd_first",  label = "Odd 1st" },
+}
 
 local sub_state = "pre_roll"
 local pre_roll_timer = 0
@@ -151,6 +161,7 @@ function Round:update(dt, player)
             end
 
             sub_state = "choosing"
+            self:applySortMode(player)
             self:updatePreview(player)
             self:slideInPanels()
         end
@@ -172,6 +183,7 @@ function Round:update(dt, player)
                 end
             end
             sub_state = "choosing"
+            self:applySortMode(player)
             self:updatePreview(player)
         end
     elseif sub_state == "scoring" then
@@ -190,6 +202,12 @@ function Round:slideInPanels()
         hand_ref_anim = { x_off = 240, alpha = 0 }
         Tween.to(hand_ref_anim, 0.4, { x_off = 0, alpha = 1 }, "outCubic")
     end
+end
+
+function Round:applySortMode(player)
+    local mode = Settings.get("dice_sort_mode") or "default"
+    player:sortDice(mode)
+    resetDieAnims(player)
 end
 
 function Round:draw(player, boss)
@@ -524,6 +542,8 @@ function Round:drawActions(player, W, H)
     local btn_y = H * 0.72
     local center_x = W / 2
 
+    self:drawSortButtons(W, btn_y - 38)
+
     local has_locked = false
     for _, die in ipairs(player.dice_pool) do
         if die.locked then has_locked = true; break end
@@ -555,7 +575,64 @@ function Round:drawActions(player, W, H)
 
     love.graphics.setFont(Fonts.get(14))
     UI.setColor(UI.colors.text_dark)
-    love.graphics.printf("Click dice to lock/unlock  |  Press 1-5 to toggle  |  R to reroll  |  Enter to score", 0, btn_y + btn_h + 12, W, "center")
+    love.graphics.printf("Click dice to lock/unlock  |  1-5 to toggle  |  R to reroll  |  Enter to score  |  Tab to sort", 0, btn_y + btn_h + 12, W, "center")
+end
+
+function Round:drawSortButtons(W, sort_y)
+    local current_sort = Settings.get("dice_sort_mode") or "default"
+    local sort_font = Fonts.get(12)
+    local sort_btn_h = 26
+    local sort_btn_gap = 5
+    local mx, my = love.mouse.getPosition()
+
+    local btn_widths = {}
+    local total_w = 0
+    for i, mode in ipairs(sort_modes) do
+        local w = sort_font:getWidth(mode.label) + 18
+        btn_widths[i] = w
+        total_w = total_w + w
+    end
+    total_w = total_w + (#sort_modes - 1) * sort_btn_gap
+
+    local label_font = Fonts.get(11)
+    local label_text = "Sort:"
+    local label_w = label_font:getWidth(label_text) + 8
+    local full_w = label_w + total_w
+    local start_x = (W - full_w) / 2
+
+    love.graphics.setFont(label_font)
+    UI.setColor(UI.colors.text_dark)
+    love.graphics.print(label_text, start_x, sort_y + (sort_btn_h - label_font:getHeight()) / 2)
+
+    self._sort_buttons = {}
+    local sx = start_x + label_w
+    for i, mode in ipairs(sort_modes) do
+        local w = btn_widths[i]
+        local is_active = mode.key == current_sort
+        local hovered = UI.pointInRect(mx, my, sx, sort_y, w, sort_btn_h)
+
+        if is_active then
+            UI.setColor(UI.colors.accent)
+        elseif hovered then
+            UI.setColor(UI.colors.panel_hover)
+        else
+            UI.setColor(UI.colors.panel_light)
+        end
+        UI.roundRect("fill", sx, sort_y, w, sort_btn_h, 4)
+
+        love.graphics.setFont(sort_font)
+        if is_active then
+            love.graphics.setColor(0.06, 0.06, 0.12, 1)
+        elseif hovered then
+            UI.setColor(UI.colors.text)
+        else
+            UI.setColor(UI.colors.text_dim)
+        end
+        love.graphics.printf(mode.label, sx, sort_y + (sort_btn_h - sort_font:getHeight()) / 2, w, "center")
+
+        self._sort_buttons[i] = { x = sx, y = sort_y, w = w, h = sort_btn_h, hovered = hovered, mode_key = mode.key }
+        sx = sx + w + sort_btn_gap
+    end
 end
 
 function Round:drawPreRoll(player, W, H)
@@ -798,6 +875,16 @@ function Round:mousepressed(x, y, button, player)
             end
         end
 
+        for _, btn in ipairs(self._sort_buttons or {}) do
+            if btn.hovered then
+                Settings.set("dice_sort_mode", btn.mode_key)
+                Settings.save()
+                self:applySortMode(player)
+                self:updatePreview(player)
+                return nil
+            end
+        end
+
         if self._reroll_hovered and player.rerolls_remaining > 0 then
             player:rerollUnlocked()
             sub_state = "rerolling"
@@ -843,7 +930,20 @@ function Round:keypressed(key, player)
     end
 
     if sub_state == "choosing" then
-        if key == "r" and player.rerolls_remaining > 0 then
+        if key == "tab" then
+            local current = Settings.get("dice_sort_mode") or "default"
+            local next_mode = sort_modes[1].key
+            for i, mode in ipairs(sort_modes) do
+                if mode.key == current then
+                    next_mode = sort_modes[(i % #sort_modes) + 1].key
+                    break
+                end
+            end
+            Settings.set("dice_sort_mode", next_mode)
+            Settings.save()
+            self:applySortMode(player)
+            self:updatePreview(player)
+        elseif key == "r" and player.rerolls_remaining > 0 then
             player:rerollUnlocked()
             sub_state = "rerolling"
         elseif key == "s" or key == "return" then

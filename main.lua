@@ -69,13 +69,15 @@ local function initNewGame(seed)
     player.hands = createHands()
 
     for i = 1, 5 do
-        table.insert(player.dice_pool, Die:new({
+        local die = Die:new({
             name = "Normal Die",
             color = "black",
             die_type = "Normal",
             ability_name = "None",
             ability_desc = "A standard die.",
-        }))
+        })
+        die._sort_order = i
+        table.insert(player.dice_pool, die)
     end
 
     current_boss = nil
@@ -142,6 +144,10 @@ function love.load()
         minheight = 540,
         vsync = Settings.get("vsync") and 1 or 0,
     })
+
+    if Settings.get("fullscreen") then
+        love.window.setFullscreen(true)
+    end
 
     music = love.audio.newSource("content/sfx/music.mp3", "stream")
     music:setLooping(true)
@@ -384,6 +390,7 @@ function handleResult(result)
     elseif result == "settings_back" then
         applyMusicVolume()
         love.window.setVSync(Settings.get("vsync") and 1 or 0)
+        love.window.setFullscreen(Settings.get("fullscreen") or false)
         if SettingsState._from_state == "pause" then
             state = SettingsState._game_draw or "round"
             paused = true

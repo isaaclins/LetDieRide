@@ -80,7 +80,51 @@ end
 
 function Player:replaceDie(index, new_die)
     if index >= 1 and index <= #self.dice_pool then
+        new_die._sort_order = self.dice_pool[index]._sort_order
         self.dice_pool[index] = new_die
+    end
+end
+
+function Player:sortDice(mode)
+    for i, die in ipairs(self.dice_pool) do
+        if not die._sort_order then die._sort_order = i end
+    end
+
+    if mode == "default" then
+        table.sort(self.dice_pool, function(a, b)
+            return (a._sort_order or 0) < (b._sort_order or 0)
+        end)
+    elseif mode == "value_asc" then
+        table.sort(self.dice_pool, function(a, b)
+            if a.value ~= b.value then return a.value < b.value end
+            return (a._sort_order or 0) < (b._sort_order or 0)
+        end)
+    elseif mode == "value_desc" then
+        table.sort(self.dice_pool, function(a, b)
+            if a.value ~= b.value then return a.value > b.value end
+            return (a._sort_order or 0) < (b._sort_order or 0)
+        end)
+    elseif mode == "type" then
+        table.sort(self.dice_pool, function(a, b)
+            if a.die_type ~= b.die_type then return a.die_type < b.die_type end
+            return (a._sort_order or 0) < (b._sort_order or 0)
+        end)
+    elseif mode == "even_first" then
+        table.sort(self.dice_pool, function(a, b)
+            local a_even = a.value % 2 == 0
+            local b_even = b.value % 2 == 0
+            if a_even ~= b_even then return a_even end
+            if a.value ~= b.value then return a.value < b.value end
+            return (a._sort_order or 0) < (b._sort_order or 0)
+        end)
+    elseif mode == "odd_first" then
+        table.sort(self.dice_pool, function(a, b)
+            local a_odd = a.value % 2 == 1
+            local b_odd = b.value % 2 == 1
+            if a_odd ~= b_odd then return a_odd end
+            if a.value ~= b.value then return a.value < b.value end
+            return (a._sort_order or 0) < (b._sort_order or 0)
+        end)
     end
 end
 

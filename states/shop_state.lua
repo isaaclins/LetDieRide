@@ -4,6 +4,7 @@ local Fonts = require("functions/fonts")
 local Tween = require("functions/tween")
 local Particles = require("functions/particles")
 local Toast = require("functions/toast")
+local Settings = require("functions/settings")
 
 local ShopState = {}
 
@@ -14,6 +15,14 @@ local selected_shop_die = nil
 local section_anims = {}
 local currency_anim = { display = 0 }
 local card_hovers = {}
+
+local MAX_DICE = 10
+local BASE_EXTRA_DIE_COST = 15
+
+local function getExtraDieCost(player)
+    local extra = math.max(0, #player.dice_pool - 5)
+    return BASE_EXTRA_DIE_COST + extra * extra * 10
+end
 
 local die_colors_map = {
     black = UI.colors.die_black,
@@ -28,6 +37,9 @@ function ShopState:init(player, all_dice_types, all_items)
     replacing_die = nil
     selected_shop_die = nil
     card_hovers = {}
+
+    local sort_mode = Settings.get("dice_sort_mode") or "default"
+    player:sortDice(sort_mode)
 
     currency_anim = { display = player.currency }
 
@@ -95,20 +107,80 @@ end
 
 function ShopState:drawPlayerDice(player, W, H)
     local count = #player.dice_pool
+    local has_ghost = count < MAX_DICE
+    local slot_count = has_ghost and (count + 1) or count
     local max_total = W * 0.7
-    local die_size = math.min(60, math.floor((max_total - (count - 1) * 8) / count))
-    local gap = math.min(12, math.floor((max_total - count * die_size) / math.max(count - 1, 1)))
-    local total = count * die_size + (count - 1) * gap
+    local die_size = math.min(60, math.floor((max_total - (slot_count - 1) * 8) / slot_count))
+    local gap = math.min(12, math.floor((max_total - slot_count * die_size) / math.max(slot_count - 1, 1)))
+    local total = slot_count * die_size + (slot_count - 1) * gap
     local start_x = (W - total) / 2
-    local die_y = 72
+    local die_y = 80
+
+    love.graphics.setFont(Fonts.get(12))
+    UI.setColor(UI.colors.text_dim)
+    love.graphics.printf("YOUR DICE", 0, 66, W, "center")
 
     for i, die in ipairs(player.dice_pool) do
         local dx = start_x + (i - 1) * (die_size + gap)
         local dot_color = die_colors_map[die.color] or UI.colors.die_black
         UI.drawDie(dx, die_y, die_size, die.value, dot_color, nil, false, false, die.glow_color)
-        love.graphics.setFont(Fonts.get(11))
+        love.graphics.setFont(Fonts.get(10))
         UI.setColor(UI.colors.text_dim)
         love.graphics.printf(die.name, dx - 5, die_y + die_size + 3, die_size + 10, "center")
+    end
+
+    if has_ghost then
+        local gx = start_x + count * (die_size + gap)
+        local gy = die_y
+        local r = die_size * 0.15
+        local mx, my = love.mouse.getPosition()
+        local ghost_hovered = UI.pointInRect(mx, my, gx, gy, die_size, die_size)
+        local cost = getExtraDieCost(player)
+        local can_afford = player.currency >= cost
+
+        local pulse = 0.5 + 0.15 * math.sin(love.timer.getTime() * 3)
+
+        if ghost_hovered and can_afford then
+            love.graphics.setColor(0.95, 0.93, 0.88, 0.25)
+        else
+            love.graphics.setColor(0.95, 0.93, 0.88, 0.10)
+        end
+        UI.roundRect("fill", gx, gy, die_size, die_size, r)
+
+        love.graphics.setLineWidth(2)
+        if ghost_hovered and can_afford then
+            love.graphics.setColor(UI.colors.accent[1], UI.colors.accent[2], UI.colors.accent[3], 0.7)
+        else
+            love.graphics.setColor(1, 1, 1, 0.15)
+        end
+        love.graphics.setLineStyle("smooth")
+        local dash_len = 6
+        local perimeter = 2 * (die_size + die_size)
+        local segments = math.floor(perimeter / (dash_len * 2))
+        UI.roundRect("line", gx, gy, die_size, die_size, r)
+        love.graphics.setLineWidth(1)
+
+        local plus_size = die_size * 0.22
+        local cx = gx + die_size / 2
+        local cy = gy + die_size / 2
+        local plus_alpha = ghost_hovered and (can_afford and 0.6 or 0.3) or (0.2 + pulse * 0.1)
+        love.graphics.setColor(1, 1, 1, plus_alpha)
+        love.graphics.setLineWidth(math.max(2, die_size * 0.04))
+        love.graphics.line(cx - plus_size, cy, cx + plus_size, cy)
+        love.graphics.line(cx, cy - plus_size, cx, cy + plus_size)
+        love.graphics.setLineWidth(1)
+
+        love.graphics.setFont(Fonts.get(11))
+        if can_afford then
+            UI.setColor(UI.colors.accent)
+        else
+            UI.setColor(UI.colors.red)
+        end
+        love.graphics.printf("$" .. cost, gx - 5, gy + die_size + 3, die_size + 10, "center")
+
+        self._ghost_die = { x = gx, y = gy, w = die_size, h = die_size, hovered = ghost_hovered, cost = cost }
+    else
+        self._ghost_die = nil
     end
 end
 
@@ -399,6 +471,36 @@ function ShopState:mousepressed(x, y, button, player)
             replacing_die = false
             selected_shop_die = nil
             return nil
+        end
+        return nil
+    end
+
+    if self._ghost_die and self._ghost_die.hovered then
+        local cost = self._ghost_die.cost
+        if #player.dice_pool >= MAX_DICE then
+            Toast.error("Dice pool is full! (max " .. MAX_DICE .. ")")
+        elseif player.currency < cost then
+            Toast.error("Not enough currency! ($" .. cost .. " needed)")
+        else
+            player.currency = player.currency - cost
+            local Die = require("objects/die")
+            local new_die = Die:new({
+                name = "Vanilla Die",
+                color = "black",
+                die_type = "vanilla",
+                ability_name = "None",
+                ability_desc = "A standard die.",
+            })
+            local max_order = 0
+            for _, d in ipairs(player.dice_pool) do
+                if (d._sort_order or 0) > max_order then max_order = d._sort_order or 0 end
+            end
+            new_die._sort_order = max_order + 1
+            table.insert(player.dice_pool, new_die)
+            local sort_mode = Settings.get("dice_sort_mode") or "default"
+            player:sortDice(sort_mode)
+            Toast.success("Added a new die to your pool!")
+            Particles.sparkle(x, y, UI.colors.green_light, 20)
         end
         return nil
     end

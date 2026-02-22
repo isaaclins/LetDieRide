@@ -64,6 +64,9 @@ function SaveLoad.serializeDie(die)
     if die.glow_color then
         data.glow_color = { die.glow_color[1], die.glow_color[2], die.glow_color[3], die.glow_color[4] }
     end
+    if die._sort_order then
+        data._sort_order = die._sort_order
+    end
     return data
 end
 
@@ -182,6 +185,7 @@ function SaveLoad.restorePlayer(data, Player, Die, createDiceTypes, createItems,
         if template and template.ability then
             die.ability = template.ability
         end
+        die._sort_order = dd._sort_order or i
         table.insert(player.dice_pool, die)
     end
 

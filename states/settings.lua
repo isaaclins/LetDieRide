@@ -89,7 +89,7 @@ function SettingsState:draw()
         love.graphics.rectangle("fill", 0, 0, W, H)
     end
 
-    local panel_w, panel_h = 420, 460
+    local panel_w, panel_h = 420, 500
     local px = (W - panel_w) / 2
     local py = (H - panel_h) / 2
 
@@ -128,6 +128,10 @@ function SettingsState:draw()
 
     local t4 = drawToggle("VSync", content_x, row_y, content_w, Settings.get("vsync"), "vsync")
     table.insert(self._toggles, t4)
+    row_y = row_y + 40
+
+    local t5 = drawToggle("Fullscreen", content_x, row_y, content_w, Settings.get("fullscreen"), "fullscreen")
+    table.insert(self._toggles, t5)
     row_y = row_y + 50
 
     local btn_w, btn_h = 140, 44
@@ -170,6 +174,9 @@ function SettingsState:mousepressed(x, y, button)
     for _, toggle in ipairs(self._toggles or {}) do
         if UI.pointInRect(x, y, toggle.x, toggle.y, toggle.w, toggle.h) then
             Settings.set(toggle.key, not Settings.get(toggle.key))
+            if toggle.key == "fullscreen" then
+                love.window.setFullscreen(Settings.get("fullscreen"))
+            end
             return nil
         end
     end
