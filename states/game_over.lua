@@ -180,13 +180,13 @@ function GameOver:draw(player)
 
     local ba2 = btn_anims[2]
     if ba2.alpha > 0 then
-        self._exit_hovered = UI.drawButton(
-            "EXIT", (W - btn_w) / 2, H * 0.78 + 70 + ba2.y_off, btn_w, btn_h,
-            { font = Fonts.get(24), color = UI.colors.red, hover_color = { 0.95, 0.30, 0.30, 1 } }
+        self._menu_hovered = UI.drawButton(
+            "MENU", (W - btn_w) / 2, H * 0.78 + 70 + ba2.y_off, btn_w, btn_h,
+            { font = Fonts.get(24), color = UI.colors.panel_light, hover_color = UI.colors.panel_hover }
         )
         if go_focus == 2 then UI.drawFocusRect((W - btn_w) / 2, H * 0.78 + 70 + ba2.y_off, btn_w, btn_h) end
     else
-        self._exit_hovered = false
+        self._menu_hovered = false
     end
 
     love.graphics.pop()
@@ -196,9 +196,9 @@ function GameOver:mousepressed(x, y, button)
     if button ~= 1 then return nil end
 
     if self._retry_hovered then
+        return "start_game"
+    elseif self._menu_hovered then
         return "restart"
-    elseif self._exit_hovered then
-        return "exit"
     end
     return nil
 end
@@ -209,9 +209,9 @@ function GameOver:keypressed(key)
         go_focus = go_focus == 1 and 2 or 1
         return nil
     elseif key == "return" or key == "space" then
-        return go_focus == 1 and "restart" or "exit"
+        return go_focus == 1 and "start_game" or "restart"
     elseif key == "escape" then
-        return "exit"
+        return "restart"
     end
     return nil
 end

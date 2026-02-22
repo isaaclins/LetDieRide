@@ -65,13 +65,14 @@ function SeedInput:draw()
 
     UI.drawPanel(box_x, box_y, box_w, box_h, { border = UI.colors.accent, border_width = 2 })
 
-    love.graphics.setFont(Fonts.get(24))
     if #input_text > 0 then
+        love.graphics.setFont(Fonts.get(24))
         UI.setColor(UI.colors.text)
         love.graphics.printf(input_text, box_x + 16, box_y + (box_h - Fonts.get(24):getHeight()) / 2, box_w - 32, "left")
     else
+        love.graphics.setFont(Fonts.get(16))
         UI.setColor(UI.colors.text_dark)
-        love.graphics.printf(placeholder, box_x + 16, box_y + (box_h - Fonts.get(24):getHeight()) / 2, box_w - 32, "left")
+        love.graphics.printf(placeholder, box_x + 16, box_y + (box_h - Fonts.get(16):getHeight()) / 2, box_w - 32, "center")
     end
 
     local cursor_alpha = 0.5 + 0.5 * math.sin(cursor_blink * math.pi * 2)
@@ -93,7 +94,7 @@ function SeedInput:draw()
         UI.roundRect("fill", btn_x - 4, btn_y - 4, btn_w + 8, btn_h + 8, 12)
     end
 
-    local start_label = #input_text > 0 and ("START: " .. input_text:upper()) or "START (RANDOM SEED)"
+    local start_label = #input_text > 0 and "START" or "START (RANDOM SEED)"
     self._start_hovered = UI.drawButton(
         start_label, btn_x, btn_y, btn_w, btn_h,
         { font = Fonts.get(20), color = UI.colors.green, hover_color = UI.colors.green_light }
