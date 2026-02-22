@@ -8,6 +8,8 @@ local Pause = {}
 local panel_anim = { scale = 0.8, alpha = 0 }
 local btn_anims = {}
 local anim_init = false
+local pause_focus = 1
+local pause_actions = { "resume", "settings", "save_and_menu", "save_and_exit" }
 
 local function initAnims()
     panel_anim = { scale = 0.8, alpha = 0 }
@@ -18,6 +20,7 @@ local function initAnims()
         btn_anims[i] = { alpha = 0, y_off = 15 }
         Tween.to(btn_anims[i], 0.3, { alpha = 1, y_off = 0 }, "outCubic")
     end
+    pause_focus = 1
     anim_init = true
 end
 
@@ -53,24 +56,28 @@ function Pause:draw()
         "RESUME", btn_x, btn_y + ba1.y_off, btn_w, btn_h,
         { font = Fonts.get(22), color = UI.colors.green, hover_color = UI.colors.green_light }
     )
+    if pause_focus == 1 then UI.drawFocusRect(btn_x, btn_y + ba1.y_off, btn_w, btn_h) end
 
     local ba2 = btn_anims[2] or { alpha = 1, y_off = 0 }
     self._settings_hovered = UI.drawButton(
         "SETTINGS", btn_x, btn_y + 60 + ba2.y_off, btn_w, btn_h,
         { font = Fonts.get(22), color = UI.colors.panel_light, hover_color = UI.colors.panel_hover }
     )
+    if pause_focus == 2 then UI.drawFocusRect(btn_x, btn_y + 60 + ba2.y_off, btn_w, btn_h) end
 
     local ba3 = btn_anims[3] or { alpha = 1, y_off = 0 }
     self._menu_hovered = UI.drawButton(
         "SAVE & MENU", btn_x, btn_y + 120 + ba3.y_off, btn_w, btn_h,
         { font = Fonts.get(22), color = UI.colors.blue }
     )
+    if pause_focus == 3 then UI.drawFocusRect(btn_x, btn_y + 120 + ba3.y_off, btn_w, btn_h) end
 
     local ba4 = btn_anims[4] or { alpha = 1, y_off = 0 }
     self._exit_hovered = UI.drawButton(
         "SAVE & EXIT", btn_x, btn_y + 180 + ba4.y_off, btn_w, btn_h,
         { font = Fonts.get(22), color = UI.colors.red, hover_color = { 0.95, 0.30, 0.30, 1 } }
     )
+    if pause_focus == 4 then UI.drawFocusRect(btn_x, btn_y + 180 + ba4.y_off, btn_w, btn_h) end
 
     love.graphics.setFont(Fonts.get(13))
     UI.setColor(UI.colors.text_dark)
@@ -104,7 +111,20 @@ function Pause:mousepressed(x, y, button)
 end
 
 function Pause:keypressed(key)
-    if key == "escape" then
+    if key == "up" then
+        pause_focus = pause_focus - 1
+        if pause_focus < 1 then pause_focus = 4 end
+        return nil
+    elseif key == "down" then
+        pause_focus = pause_focus + 1
+        if pause_focus > 4 then pause_focus = 1 end
+        return nil
+    elseif key == "return" or key == "space" then
+        if pause_focus == 1 or pause_focus == 3 or pause_focus == 4 then
+            anim_init = false
+        end
+        return pause_actions[pause_focus]
+    elseif key == "escape" then
         anim_init = false
         return "resume"
     end

@@ -8,6 +8,21 @@ local dragging = nil
 local from_pause = false
 local sub_view = "main"
 local listening_action = nil
+local settings_focus = 1
+local kb_focus = 1
+
+local main_focus_items = {
+    { type = "slider", key = "master_volume" },
+    { type = "slider", key = "music_volume" },
+    { type = "toggle", key = "pause_on_unfocus" },
+    { type = "toggle", key = "screenshake" },
+    { type = "toggle", key = "show_fps" },
+    { type = "toggle", key = "vsync" },
+    { type = "toggle", key = "fullscreen" },
+    { type = "button", action = "back" },
+    { type = "button", action = "keys" },
+    { type = "button", action = "reset" },
+}
 
 local keybind_actions = {
     { setting = "keybind_select_next",  label = "Select Next Die" },
@@ -26,6 +41,8 @@ function SettingsState:init(opts)
     dragging = nil
     sub_view = "main"
     listening_action = nil
+    settings_focus = 1
+    kb_focus = 1
 end
 
 local function drawSlider(label, x, y, w, value, key)
@@ -176,6 +193,23 @@ function SettingsState:drawMainView(W, H)
         "RESET", btn_start_x + (btn_w + btn_gap) * 2, btn_row_y, btn_w, btn_h,
         { font = Fonts.get(18), color = UI.colors.red, hover_color = { 0.95, 0.30, 0.30, 1 } }
     )
+
+    local focus_rects = {
+        { x = content_x - 4, y = py + 66, w = content_w + 8, h = 48 },
+        { x = content_x - 4, y = py + 122, w = content_w + 8, h = 48 },
+        { x = content_x - 4, y = py + 194, w = content_w + 8, h = 30 },
+        { x = content_x - 4, y = py + 230, w = content_w + 8, h = 30 },
+        { x = content_x - 4, y = py + 266, w = content_w + 8, h = 30 },
+        { x = content_x - 4, y = py + 302, w = content_w + 8, h = 30 },
+        { x = content_x - 4, y = py + 338, w = content_w + 8, h = 30 },
+        { x = btn_start_x, y = btn_row_y, w = btn_w, h = btn_h },
+        { x = btn_start_x + btn_w + btn_gap, y = btn_row_y, w = btn_w, h = btn_h },
+        { x = btn_start_x + (btn_w + btn_gap) * 2, y = btn_row_y, w = btn_w, h = btn_h },
+    }
+    if settings_focus >= 1 and settings_focus <= #focus_rects then
+        local r = focus_rects[settings_focus]
+        UI.drawFocusRect(r.x, r.y, r.w, r.h)
+    end
 end
 
 function SettingsState:drawKeybindsView(W, H)
@@ -262,6 +296,17 @@ function SettingsState:drawKeybindsView(W, H)
         "RESET KEYS", px + panel_w / 2 + btn_gap / 2, btn_row_y, btn_w, btn_h,
         { font = Fonts.get(16), color = UI.colors.red, hover_color = { 0.95, 0.30, 0.30, 1 } }
     )
+
+    local kb_rects = {}
+    for idx = 1, #keybind_actions do
+        kb_rects[idx] = { x = content_x - 4, y = row_y + (idx - 1) * row_h - 2, w = content_w + 8, h = row_h - 4 }
+    end
+    kb_rects[#keybind_actions + 1] = { x = px + panel_w / 2 - btn_w - btn_gap / 2, y = btn_row_y, w = btn_w, h = btn_h }
+    kb_rects[#keybind_actions + 2] = { x = px + panel_w / 2 + btn_gap / 2, y = btn_row_y, w = btn_w, h = btn_h }
+    if kb_focus >= 1 and kb_focus <= #kb_rects then
+        local r = kb_rects[kb_focus]
+        UI.drawFocusRect(r.x, r.y, r.w, r.h)
+    end
 end
 
 function SettingsState:update(dt)
@@ -367,7 +412,38 @@ function SettingsState:keypressed(key)
             end
             return nil
         end
-        if key == "escape" then
+        local total = #keybind_actions + 2
+        if key == "up" then
+            kb_focus = kb_focus - 1
+            if kb_focus < 1 then kb_focus = total end
+            return nil
+        elseif key == "down" then
+            kb_focus = kb_focus + 1
+            if kb_focus > total then kb_focus = 1 end
+            return nil
+        elseif key == "left" then
+            if kb_focus == #keybind_actions + 2 then
+                kb_focus = #keybind_actions + 1
+            end
+            return nil
+        elseif key == "right" then
+            if kb_focus == #keybind_actions + 1 then
+                kb_focus = #keybind_actions + 2
+            end
+            return nil
+        elseif key == "return" or key == "space" then
+            if kb_focus <= #keybind_actions then
+                listening_action = keybind_actions[kb_focus].setting
+            elseif kb_focus == #keybind_actions + 1 then
+                Settings.save()
+                sub_view = "main"
+                listening_action = nil
+            elseif kb_focus == #keybind_actions + 2 then
+                Settings.resetKeybinds()
+                listening_action = nil
+            end
+            return nil
+        elseif key == "escape" then
             Settings.save()
             sub_view = "main"
             return nil
@@ -375,7 +451,59 @@ function SettingsState:keypressed(key)
         return nil
     end
 
-    if key == "escape" then
+    local item_count = #main_focus_items
+    if key == "up" then
+        settings_focus = settings_focus - 1
+        if settings_focus < 1 then settings_focus = item_count end
+        return nil
+    elseif key == "down" then
+        settings_focus = settings_focus + 1
+        if settings_focus > item_count then settings_focus = 1 end
+        return nil
+    elseif key == "left" or key == "right" then
+        local item = main_focus_items[settings_focus]
+        if item then
+            if item.type == "slider" then
+                local val = Settings.get(item.key)
+                local delta = key == "right" and 0.05 or -0.05
+                Settings.set(item.key, math.max(0, math.min(1, val + delta)))
+            elseif item.type == "toggle" then
+                Settings.set(item.key, not Settings.get(item.key))
+                if item.key == "fullscreen" then
+                    love.window.setFullscreen(Settings.get("fullscreen"))
+                end
+            elseif item.type == "button" then
+                if key == "left" and settings_focus > 8 then
+                    settings_focus = settings_focus - 1
+                elseif key == "right" and settings_focus < item_count then
+                    settings_focus = settings_focus + 1
+                end
+            end
+        end
+        return nil
+    elseif key == "return" or key == "space" then
+        local item = main_focus_items[settings_focus]
+        if item then
+            if item.type == "toggle" then
+                Settings.set(item.key, not Settings.get(item.key))
+                if item.key == "fullscreen" then
+                    love.window.setFullscreen(Settings.get("fullscreen"))
+                end
+            elseif item.type == "button" then
+                if item.action == "back" then
+                    Settings.save()
+                    return "settings_back"
+                elseif item.action == "keys" then
+                    sub_view = "keybinds"
+                    kb_focus = 1
+                    listening_action = nil
+                elseif item.action == "reset" then
+                    Settings.reset()
+                end
+            end
+        end
+        return nil
+    elseif key == "escape" then
         Settings.save()
         return "settings_back"
     end

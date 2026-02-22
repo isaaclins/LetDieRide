@@ -280,4 +280,13 @@ function UI.resetButtonAnims()
     button_anim = {}
 end
 
+function UI.drawFocusRect(x, y, w, h, r)
+    local t = love.timer.getTime()
+    local pulse = 0.5 + 0.5 * math.sin(t * 4)
+    love.graphics.setLineWidth(2.5)
+    love.graphics.setColor(1.0, 0.84, 0, 0.6 + 0.3 * pulse)
+    UI.roundRect("line", x - 3, y - 3, w + 6, h + 6, (r or 8) + 1)
+    love.graphics.setLineWidth(1)
+end
+
 return UI

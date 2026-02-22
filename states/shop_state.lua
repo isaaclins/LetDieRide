@@ -19,6 +19,20 @@ local card_hovers = {}
 local MAX_DICE = 10
 local BASE_EXTRA_DIE_COST = 15
 
+local shop_col = 1
+local shop_row = 1
+local shop_mode = "grid"
+local replace_focus = 1
+
+local function getColItemCount(col)
+    if not shop then return 0 end
+    if col == 1 then return #shop.hand_upgrades
+    elseif col == 2 then return #shop.dice_inventory
+    elseif col == 3 then return #shop.items_inventory
+    end
+    return 0
+end
+
 local function getExtraDieCost(player)
     local extra = math.max(0, #player.dice_pool - 5)
     return BASE_EXTRA_DIE_COST + extra * extra * 10
@@ -37,6 +51,10 @@ function ShopState:init(player, all_dice_types, all_items)
     replacing_die = nil
     selected_shop_die = nil
     card_hovers = {}
+    shop_col = 1
+    shop_row = 1
+    shop_mode = "grid"
+    replace_focus = 1
 
     local sort_mode = Settings.get("dice_sort_mode") or "default"
     player:sortDice(sort_mode)
@@ -82,6 +100,15 @@ function ShopState:draw(player)
     self:drawDiceSection(player, W, H)
     self:drawItemsSection(player, W, H)
     self:drawContinueButton(W, H)
+
+    if not replacing_die then
+        love.graphics.setFont(Fonts.get(12))
+        UI.setColor(UI.colors.text_dark)
+        love.graphics.printf(
+            "Arrows: Navigate  |  Enter: Select  |  Tab: Continue  |  Esc: Pause",
+            0, H - 22, W, "center"
+        )
+    end
 
     if replacing_die then
         self:drawDieReplaceOverlay(player, W, H)
@@ -179,6 +206,10 @@ function ShopState:drawPlayerDice(player, W, H)
         love.graphics.printf("$" .. cost, gx - 5, gy + die_size + 3, die_size + 10, "center")
 
         self._ghost_die = { x = gx, y = gy, w = die_size, h = die_size, hovered = ghost_hovered, cost = cost }
+
+        if shop_mode == "ghost" and not replacing_die then
+            UI.drawFocusRect(gx, gy, die_size, die_size)
+        end
     else
         self._ghost_die = nil
     end
@@ -252,6 +283,10 @@ function ShopState:drawHandUpgrades(player, W, H)
         end
 
         self._hand_upgrade_buttons[i] = { x = item_x, y = iy, w = item_w, h = 50, hovered = hovered }
+
+        if shop_mode == "grid" and shop_col == 1 and shop_row == i and not replacing_die then
+            UI.drawFocusRect(item_x, iy + ch.lift, item_w, 50)
+        end
     end
 
     if #shop.hand_upgrades == 0 then
@@ -321,6 +356,10 @@ function ShopState:drawDiceSection(player, W, H)
         end
 
         self._dice_buttons[i] = { x = item_x, y = iy, w = item_w, h = 72, hovered = hovered }
+
+        if shop_mode == "grid" and shop_col == 2 and shop_row == i and not replacing_die then
+            UI.drawFocusRect(item_x, iy + ch.lift, item_w, 72)
+        end
     end
 
     if #shop.dice_inventory == 0 then
@@ -379,6 +418,10 @@ function ShopState:drawItemsSection(player, W, H)
         love.graphics.printf("$" .. item.cost, item_x, iy + 8 + ch.lift, item_w - 8, "right")
 
         self._item_buttons[i] = { x = item_x, y = iy, w = item_w, h = 60, hovered = hovered }
+
+        if shop_mode == "grid" and shop_col == 3 and shop_row == i and not replacing_die then
+            UI.drawFocusRect(item_x, iy + ch.lift, item_w, 60)
+        end
     end
 
     if #shop.items_inventory == 0 then
@@ -404,6 +447,9 @@ function ShopState:drawContinueButton(W, H)
         "CONTINUE", (W - btn_w) / 2, H - 70, btn_w, btn_h,
         { font = Fonts.get(22), color = UI.colors.green, hover_color = UI.colors.green_light }
     )
+    if shop_mode == "continue" and not replacing_die then
+        UI.drawFocusRect((W - btn_w) / 2, H - 70, btn_w, btn_h)
+    end
 end
 
 function ShopState:drawDieReplaceOverlay(player, W, H)
@@ -438,6 +484,10 @@ function ShopState:drawDieReplaceOverlay(player, W, H)
         UI.drawDie(dx, die_y, die_size, die.value, dot_color, nil, false, hovered, die.glow_color)
         self._replace_die_buttons[i] = { x = dx, y = die_y, w = die_size, h = die_size }
 
+        if replace_focus == i then
+            UI.drawFocusRect(dx, die_y, die_size, die_size)
+        end
+
         love.graphics.setFont(Fonts.get(10))
         UI.setColor(UI.colors.text_dim)
         love.graphics.printf(die.name, dx - 5, die_y + die_size + 3, die_size + 10, "center")
@@ -447,6 +497,9 @@ function ShopState:drawDieReplaceOverlay(player, W, H)
         "CANCEL", px + panel_w / 2 - 60, py + panel_h - 40, 120, 32,
         { font = Fonts.get(16), color = UI.colors.red }
     )
+    if replace_focus == 0 then
+        UI.drawFocusRect(px + panel_w / 2 - 60, py + panel_h - 40, 120, 32)
+    end
 end
 
 function ShopState:mousepressed(x, y, button, player)
@@ -546,17 +599,142 @@ function ShopState:mousepressed(x, y, button, player)
     return nil
 end
 
-function ShopState:keypressed(key)
-    if key == "return" or key == "space" then
-        if not replacing_die then
-            return "next_round"
-        end
-    elseif key == "escape" then
-        if replacing_die then
+function ShopState:keypressed(key, player)
+    if replacing_die then
+        local count = player and #player.dice_pool or 0
+        if key == "left" then
+            if replace_focus > 0 then
+                replace_focus = replace_focus - 1
+                if replace_focus < 1 then replace_focus = count end
+            else
+                replace_focus = count
+            end
+        elseif key == "right" then
+            if replace_focus > 0 then
+                replace_focus = replace_focus + 1
+                if replace_focus > count then replace_focus = 1 end
+            else
+                replace_focus = 1
+            end
+        elseif key == "down" then
+            replace_focus = 0
+        elseif key == "up" then
+            if replace_focus == 0 then replace_focus = 1 end
+        elseif key == "return" or key == "space" then
+            if replace_focus == 0 then
+                replacing_die = false
+                selected_shop_die = nil
+            elseif replace_focus >= 1 and replace_focus <= count then
+                local ok, msg = shop:buyDie(player, selected_shop_die, replace_focus)
+                if ok then
+                    Toast.success(msg)
+                else
+                    Toast.error(msg)
+                end
+                replacing_die = false
+                selected_shop_die = nil
+            end
+        elseif key == "escape" then
             replacing_die = false
             selected_shop_die = nil
         end
+        return nil
     end
+
+    if shop_mode == "grid" then
+        local col_count = getColItemCount(shop_col)
+        if key == "left" then
+            shop_col = shop_col - 1
+            if shop_col < 1 then shop_col = 3 end
+            local new_count = getColItemCount(shop_col)
+            shop_row = math.min(shop_row, new_count)
+            if shop_row < 1 and new_count > 0 then shop_row = 1 end
+        elseif key == "right" then
+            shop_col = shop_col + 1
+            if shop_col > 3 then shop_col = 1 end
+            local new_count = getColItemCount(shop_col)
+            shop_row = math.min(shop_row, new_count)
+            if shop_row < 1 and new_count > 0 then shop_row = 1 end
+        elseif key == "up" then
+            if shop_row > 1 then
+                shop_row = shop_row - 1
+            else
+                shop_mode = "ghost"
+            end
+        elseif key == "down" then
+            if shop_row < col_count then
+                shop_row = shop_row + 1
+            else
+                shop_mode = "continue"
+            end
+        elseif key == "return" or key == "space" then
+            if shop_col == 1 and shop_row >= 1 and shop_row <= #shop.hand_upgrades then
+                local ok, msg = shop:buyHandUpgrade(player, shop_row)
+                if ok then Toast.success(msg) else Toast.error(msg) end
+            elseif shop_col == 2 and shop_row >= 1 and shop_row <= #shop.dice_inventory then
+                replacing_die = true
+                selected_shop_die = shop_row
+                replace_focus = 1
+            elseif shop_col == 3 and shop_row >= 1 and shop_row <= #shop.items_inventory then
+                local ok, msg = shop:buyItem(player, shop_row)
+                if ok then Toast.success(msg) else Toast.error(msg) end
+            end
+        elseif key == "tab" then
+            shop_mode = "continue"
+        end
+    elseif shop_mode == "ghost" then
+        if key == "down" then
+            shop_mode = "grid"
+            local col_count = getColItemCount(shop_col)
+            if col_count > 0 then shop_row = 1 else shop_mode = "continue" end
+        elseif key == "return" or key == "space" then
+            if player and #player.dice_pool < MAX_DICE then
+                local cost = getExtraDieCost(player)
+                if player.currency >= cost then
+                    player.currency = player.currency - cost
+                    local Die = require("objects/die")
+                    local new_die = Die:new({
+                        name = "Vanilla Die", color = "black",
+                        die_type = "vanilla", ability_name = "None",
+                        ability_desc = "A standard die.",
+                    })
+                    local max_order = 0
+                    for _, d in ipairs(player.dice_pool) do
+                        if (d._sort_order or 0) > max_order then max_order = d._sort_order or 0 end
+                    end
+                    new_die._sort_order = max_order + 1
+                    table.insert(player.dice_pool, new_die)
+                    local sort_mode = Settings.get("dice_sort_mode") or "default"
+                    player:sortDice(sort_mode)
+                    Toast.success("Added a new die to your pool!")
+                else
+                    Toast.error("Not enough currency! ($" .. cost .. " needed)")
+                end
+            elseif player then
+                Toast.error("Dice pool is full! (max " .. MAX_DICE .. ")")
+            end
+        elseif key == "tab" then
+            shop_mode = "continue"
+        end
+    elseif shop_mode == "continue" then
+        if key == "up" then
+            shop_mode = "grid"
+            local col_count = getColItemCount(shop_col)
+            shop_row = math.max(1, col_count)
+            if col_count == 0 then shop_mode = "ghost" end
+        elseif key == "return" or key == "space" then
+            return "next_round"
+        elseif key == "tab" then
+            local shift_held = love.keyboard.isDown("lshift") or love.keyboard.isDown("rshift")
+            if shift_held then
+                shop_mode = "grid"
+                local col_count = getColItemCount(shop_col)
+                shop_row = math.max(1, col_count)
+                if col_count == 0 then shop_mode = "ghost" end
+            end
+        end
+    end
+
     return nil
 end
 

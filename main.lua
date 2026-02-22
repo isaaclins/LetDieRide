@@ -313,7 +313,7 @@ function love.keypressed(key)
     elseif state == "round" then
         result = RoundState:keypressed(key, player)
     elseif state == "shop" then
-        result = ShopState:keypressed(key)
+        result = ShopState:keypressed(key, player)
     elseif state == "game_over" then
         result = GameOverState:keypressed(key)
     end

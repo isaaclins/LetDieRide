@@ -16,6 +16,9 @@ local button_anims = {}
 local footer_anim = { alpha = 0 }
 local title_glow_time = 0
 local subtitle_text = "A Yahtzee Roguelike"
+local splash_focus = 1
+local splash_actions = {}
+local splash_btn_count = 0
 
 local function spawnDie(W, H, start_above)
     local depth = 0.3 + math.random() * 0.7
@@ -66,6 +69,7 @@ function Splash:init()
     Tween.to(footer_anim, 0.8, { alpha = 1 }, "outCubic")
 
     title_glow_time = 0
+    splash_focus = 1
 end
 
 function Splash:update(dt)
@@ -156,38 +160,55 @@ function Splash:draw()
     local btn_y = H * 0.46
 
     local btn_idx = 1
+    local focus_idx = 0
+    splash_actions = {}
+
     if has_save then
+        focus_idx = focus_idx + 1
+        splash_actions[focus_idx] = "continue_game"
         local ba = button_anims[btn_idx] or { alpha = 1, y_off = 0 }
         love.graphics.setColor(1, 1, 1, ba.alpha)
         self._continue_hovered = UI.drawButton(
             "CONTINUE", btn_x, btn_y + ba.y_off, btn_w, btn_h,
             { font = Fonts.get(26), color = UI.colors.accent, hover_color = { 1.0, 0.90, 0.20, 1 } }
         )
+        if splash_focus == focus_idx then UI.drawFocusRect(btn_x, btn_y + ba.y_off, btn_w, btn_h) end
         btn_y = btn_y + 68
         btn_idx = btn_idx + 1
     else
         self._continue_hovered = false
     end
 
+    focus_idx = focus_idx + 1
+    splash_actions[focus_idx] = "start_game"
     local ba = button_anims[btn_idx] or { alpha = 1, y_off = 0 }
     self._new_game_hovered = UI.drawButton(
         "NEW GAME", btn_x, btn_y + ba.y_off, btn_w, btn_h,
         { font = Fonts.get(26), color = UI.colors.green, hover_color = UI.colors.green_light }
     )
+    if splash_focus == focus_idx then UI.drawFocusRect(btn_x, btn_y + ba.y_off, btn_w, btn_h) end
     btn_idx = btn_idx + 1
 
+    focus_idx = focus_idx + 1
+    splash_actions[focus_idx] = "open_settings"
     ba = button_anims[btn_idx] or { alpha = 1, y_off = 0 }
     self._settings_hovered = UI.drawButton(
         "SETTINGS", btn_x, btn_y + 68 + ba.y_off, btn_w, btn_h,
         { font = Fonts.get(26), color = UI.colors.panel_light, hover_color = UI.colors.panel_hover }
     )
+    if splash_focus == focus_idx then UI.drawFocusRect(btn_x, btn_y + 68 + ba.y_off, btn_w, btn_h) end
     btn_idx = btn_idx + 1
 
+    focus_idx = focus_idx + 1
+    splash_actions[focus_idx] = "exit"
     ba = button_anims[btn_idx] or { alpha = 1, y_off = 0 }
     self._exit_hovered = UI.drawButton(
         "EXIT", btn_x, btn_y + 136 + ba.y_off, btn_w, btn_h,
         { font = Fonts.get(26), color = UI.colors.red, hover_color = { 0.95, 0.30, 0.30, 1 } }
     )
+    if splash_focus == focus_idx then UI.drawFocusRect(btn_x, btn_y + 136 + ba.y_off, btn_w, btn_h) end
+
+    splash_btn_count = focus_idx
 
     love.graphics.setFont(Fonts.get(14))
     love.graphics.setColor(UI.colors.text_dark[1], UI.colors.text_dark[2], UI.colors.text_dark[3], footer_anim.alpha)
@@ -210,10 +231,22 @@ function Splash:mousepressed(x, y, button)
 end
 
 function Splash:keypressed(key)
-    if key == "return" or key == "space" then
-        if has_save then
-            return "continue_game"
+    if splash_btn_count > 0 then
+        if key == "up" then
+            splash_focus = splash_focus - 1
+            if splash_focus < 1 then splash_focus = splash_btn_count end
+            return nil
+        elseif key == "down" then
+            splash_focus = splash_focus + 1
+            if splash_focus > splash_btn_count then splash_focus = 1 end
+            return nil
         end
+    end
+    if key == "return" or key == "space" then
+        if splash_actions[splash_focus] then
+            return splash_actions[splash_focus]
+        end
+        if has_save then return "continue_game" end
         return "start_game"
     elseif key == "escape" then
         return "exit"

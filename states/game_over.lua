@@ -12,10 +12,12 @@ local seed_anim = { alpha = 0 }
 local btn_anims = {}
 local shake = { x = 0, y = 0, intensity = 0 }
 local drift_spawned = false
+local go_focus = 1
 
 function GameOver:init()
     time_elapsed = 0
     drift_spawned = false
+    go_focus = 1
 
     title_anim = { y = -200, scale = 2.0, alpha = 0 }
     Tween.to(title_anim, 0.7, { y = 0, scale = 1.0, alpha = 1 }, "outElastic", function()
@@ -171,6 +173,7 @@ function GameOver:draw(player)
             "PLAY AGAIN", (W - btn_w) / 2, H * 0.78 + ba1.y_off, btn_w, btn_h,
             { font = Fonts.get(24), color = UI.colors.blue }
         )
+        if go_focus == 1 then UI.drawFocusRect((W - btn_w) / 2, H * 0.78 + ba1.y_off, btn_w, btn_h) end
     else
         self._retry_hovered = false
     end
@@ -181,6 +184,7 @@ function GameOver:draw(player)
             "EXIT", (W - btn_w) / 2, H * 0.78 + 70 + ba2.y_off, btn_w, btn_h,
             { font = Fonts.get(24), color = UI.colors.red, hover_color = { 0.95, 0.30, 0.30, 1 } }
         )
+        if go_focus == 2 then UI.drawFocusRect((W - btn_w) / 2, H * 0.78 + 70 + ba2.y_off, btn_w, btn_h) end
     else
         self._exit_hovered = false
     end
@@ -201,8 +205,11 @@ end
 
 function GameOver:keypressed(key)
     if time_elapsed < 2.0 then return nil end
-    if key == "return" or key == "space" then
-        return "restart"
+    if key == "up" or key == "down" then
+        go_focus = go_focus == 1 and 2 or 1
+        return nil
+    elseif key == "return" or key == "space" then
+        return go_focus == 1 and "restart" or "exit"
     elseif key == "escape" then
         return "exit"
     end
