@@ -8,6 +8,26 @@ local Settings = require("functions/settings")
 
 local ShopState = {}
 
+local hand_examples = {
+    ["High Roll"]       = { 6 },
+    ["Pair"]            = { 3, 3 },
+    ["Two Pair"]        = { 2, 2, 5, 5 },
+    ["Three of a Kind"] = { 4, 4, 4 },
+    ["Small Straight"]  = { 2, 3, 4, 5 },
+    ["Full House"]      = { 3, 3, 3, 6, 6 },
+    ["Large Straight"]  = { 1, 2, 3, 4, 5 },
+    ["Four of a Kind"]  = { 1, 1, 1, 1 },
+    ["Five of a Kind"]  = { 5, 5, 5, 5, 5 },
+    ["All Even"]        = { 2, 4, 6, 2, 4 },
+    ["All Odd"]         = { 1, 3, 5, 1, 3 },
+    ["Three Pairs"]     = { 1, 1, 3, 3, 5, 5 },
+    ["Two Triplets"]    = { 2, 2, 2, 5, 5, 5 },
+    ["Full Run"]        = { 1, 2, 3, 4, 5, 6 },
+    ["Six of a Kind"]   = { 3, 3, 3, 3, 3, 3 },
+    ["Seven of a Kind"] = { 6, 6, 6, 6, 6, 6, 6 },
+    ["Pyramid"]         = { 2, 4, 4, 4, 6, 6, 6, 6, 6 },
+}
+
 local shop = nil
 local replacing_die = nil
 local selected_shop_die = nil
@@ -23,12 +43,13 @@ local shop_col = 1
 local shop_row = 1
 local shop_mode = "grid"
 local replace_focus = 1
+local shop_visible_hands = {}
 
 local function getColItemCount(col)
     if not shop then return 0 end
-    if col == 1 then return #shop.hand_upgrades
-    elseif col == 2 then return #shop.dice_inventory
-    elseif col == 3 then return #shop.items_inventory
+    if col == 1 then return #shop.dice_inventory
+    elseif col == 2 then return #shop.items_inventory
+    elseif col == 3 then return #shop_visible_hands
     end
     return 0
 end
@@ -96,9 +117,9 @@ function ShopState:draw(player)
 
     self:drawHeader(player, W)
     self:drawPlayerDice(player, W, H)
-    self:drawHandUpgrades(player, W, H)
     self:drawDiceSection(player, W, H)
     self:drawItemsSection(player, W, H)
+    self:drawShopHandReference(player, W, H)
     self:drawContinueButton(W, H)
 
     if not replacing_die then
@@ -215,90 +236,105 @@ function ShopState:drawPlayerDice(player, W, H)
     end
 end
 
-function ShopState:drawHandUpgrades(player, W, H)
-    local sa = section_anims[1] or { y_off = 0, alpha = 1 }
-    local section_x = 20
+function ShopState:drawShopHandReference(player, W, H)
+    local sa = section_anims[3] or { y_off = 0, alpha = 1 }
+    local section_x = 2 * W / 3 + 10
     local section_y = 160 + sa.y_off
     local section_w = W / 3 - 30
     local section_h = H - 250
+
+    local dice_count = #player.dice_pool
+    shop_visible_hands = {}
+    local upgrade_index_map = {}
+    for _, hand in ipairs(player.hands) do
+        if (hand.min_dice or 1) <= dice_count then
+            table.insert(shop_visible_hands, hand)
+        end
+    end
+    for i, upgrade in ipairs(shop.hand_upgrades) do
+        upgrade_index_map[upgrade.hand] = i
+    end
+
+    local line_h = #shop_visible_hands > 12 and 26 or 32
+    local font_size = #shop_visible_hands > 12 and 11 or 13
 
     love.graphics.setColor(1, 1, 1, sa.alpha)
     UI.drawPanel(section_x, section_y, section_w, section_h, { border = UI.colors.panel_light })
 
     love.graphics.setFont(Fonts.get(18))
     love.graphics.setColor(UI.colors.accent[1], UI.colors.accent[2], UI.colors.accent[3], sa.alpha)
-    love.graphics.printf("HAND UPGRADES", section_x, section_y + 10, section_w, "center")
+    love.graphics.printf("HAND TYPES", section_x, section_y + 10, section_w, "center")
 
-    self._hand_upgrade_buttons = {}
+    self._hand_ref_buttons = {}
     local mx, my = love.mouse.getPosition()
 
-    for i, upgrade in ipairs(shop.hand_upgrades) do
-        local iy = section_y + 40 + (i - 1) * 58
-        if iy + 50 > section_y + section_h then break end
+    for i, hand in ipairs(shop_visible_hands) do
+        local y = section_y + 40 + (i - 1) * line_h
+        if y + line_h > section_y + section_h then break end
 
-        local maxed = upgrade.hand.upgrade_level >= upgrade.hand.max_upgrade
-        local live_cost = upgrade.hand:getUpgradeCost()
-        local item_x = section_x + 10
-        local item_w = section_w - 20
-        local hovered = not maxed and UI.pointInRect(mx, my, item_x, iy, item_w, 50)
+        local maxed = hand.upgrade_level >= hand.max_upgrade
+        local upgrade_idx = upgrade_index_map[hand]
+        local can_upgrade = upgrade_idx and not maxed
+        local hovered = UI.pointInRect(mx, my, section_x + 4, y, section_w - 8, line_h)
 
-        local key = "hand_" .. i
-        setCardHoverState(key, hovered)
-        local ch = getCardHover(key)
-
-        UI.setColor(hovered and UI.colors.panel_hover or UI.colors.panel_light)
-        if ch.shadow > 0.5 then
-            love.graphics.setColor(0, 0, 0, 0.15)
-            UI.roundRect("fill", item_x + 2, iy + ch.shadow + 2, item_w, 50, 6)
+        if hovered then
+            love.graphics.setColor(1, 1, 1, 0.08 * sa.alpha)
+            UI.roundRect("fill", section_x + 4, y, section_w - 8, line_h, 3)
         end
-        UI.setColor(hovered and UI.colors.panel_hover or UI.colors.panel_light)
-        UI.roundRect("fill", item_x, iy + ch.lift, item_w, 50, 6)
 
-        love.graphics.setFont(Fonts.get(14))
-        if maxed then
-            UI.setColor(UI.colors.text_dark)
-            love.graphics.print(upgrade.hand.name .. " MAX", item_x + 8, iy + 6 + ch.lift)
+        local is_focused = shop_mode == "grid" and shop_col == 3 and shop_row == i and not replacing_die
+        if is_focused then
+            UI.drawFocusRect(section_x + 4, y, section_w - 8, line_h)
+        end
+
+        love.graphics.setFont(Fonts.get(font_size))
+
+        if hand.upgrade_level > 0 then
+            love.graphics.setColor(UI.colors.accent[1], UI.colors.accent[2], UI.colors.accent[3], sa.alpha)
+        elseif hovered or is_focused then
+            love.graphics.setColor(1, 1, 1, sa.alpha)
         else
-            UI.setColor(UI.colors.text)
-            love.graphics.print(upgrade.hand.name .. " +" .. (upgrade.hand.upgrade_level + 1), item_x + 8, iy + 6 + ch.lift)
+            love.graphics.setColor(UI.colors.text_dim[1], UI.colors.text_dim[2], UI.colors.text_dim[3], sa.alpha)
+        end
+        love.graphics.print(hand.name, section_x + 10, y + 2)
+
+        love.graphics.setColor(UI.colors.text_dim[1], UI.colors.text_dim[2], UI.colors.text_dim[3], sa.alpha * 0.8)
+        love.graphics.printf(hand:getDisplayScore(), section_x, y + 2, section_w - 10, "right")
+
+        if (hovered or is_focused) and can_upgrade then
+            local cost_y = y + 2 + (font_size + 2)
+            if not shop.free_choice_used then
+                love.graphics.setColor(UI.colors.free_badge[1], UI.colors.free_badge[2], UI.colors.free_badge[3], sa.alpha)
+                love.graphics.setFont(Fonts.get(10))
+                love.graphics.printf("FREE UPGRADE", section_x + 10, cost_y, section_w - 20, "left")
+            else
+                local live_cost = hand:getUpgradeCost()
+                local can_afford = player.currency >= live_cost
+                if can_afford then
+                    love.graphics.setColor(UI.colors.green[1], UI.colors.green[2], UI.colors.green[3], sa.alpha)
+                else
+                    love.graphics.setColor(UI.colors.red[1], UI.colors.red[2], UI.colors.red[3], sa.alpha)
+                end
+                love.graphics.setFont(Fonts.get(10))
+                love.graphics.printf("Upgrade $" .. live_cost, section_x + 10, cost_y, section_w - 20, "left")
+            end
+        elseif (hovered or is_focused) and maxed then
+            local cost_y = y + 2 + (font_size + 2)
+            love.graphics.setColor(UI.colors.text_dark[1], UI.colors.text_dark[2], UI.colors.text_dark[3], sa.alpha)
+            love.graphics.setFont(Fonts.get(10))
+            love.graphics.printf("MAXED", section_x + 10, cost_y, section_w - 20, "left")
         end
 
-        love.graphics.setFont(Fonts.get(12))
-        UI.setColor(UI.colors.text_dim)
-        love.graphics.print(upgrade.hand:getDisplayScore(), item_x + 8, iy + 26 + ch.lift)
-
-        if maxed then
-            UI.setColor(UI.colors.text_dark)
-            love.graphics.setFont(Fonts.get(14))
-            love.graphics.printf("MAXED", item_x, iy + 8 + ch.lift, item_w - 8, "right")
-        elseif not shop.free_choice_used then
-            UI.setColor(UI.colors.free_badge)
-            love.graphics.setFont(Fonts.get(14))
-            love.graphics.printf("FREE", item_x, iy + 8 + ch.lift, item_w - 8, "right")
-        else
-            local can_afford = player.currency >= live_cost
-            UI.setColor(can_afford and UI.colors.accent or UI.colors.red)
-            love.graphics.setFont(Fonts.get(14))
-            love.graphics.printf("$" .. live_cost, item_x, iy + 8 + ch.lift, item_w - 8, "right")
-        end
-
-        self._hand_upgrade_buttons[i] = { x = item_x, y = iy, w = item_w, h = 50, hovered = hovered }
-
-        if shop_mode == "grid" and shop_col == 1 and shop_row == i and not replacing_die then
-            UI.drawFocusRect(item_x, iy + ch.lift, item_w, 50)
-        end
-    end
-
-    if #shop.hand_upgrades == 0 then
-        love.graphics.setFont(Fonts.get(12))
-        UI.setColor(UI.colors.text_dark)
-        love.graphics.printf("All hands maxed!", section_x, section_y + 60, section_w, "center")
+        self._hand_ref_buttons[i] = {
+            x = section_x + 4, y = y, w = section_w - 8, h = line_h,
+            hovered = hovered, upgrade_idx = upgrade_idx, can_upgrade = can_upgrade,
+        }
     end
 end
 
 function ShopState:drawDiceSection(player, W, H)
-    local sa = section_anims[2] or { y_off = 0, alpha = 1 }
-    local section_x = W / 3 + 5
+    local sa = section_anims[1] or { y_off = 0, alpha = 1 }
+    local section_x = 20
     local section_y = 160 + sa.y_off
     local section_w = W / 3 - 30
     local section_h = H - 250
@@ -367,7 +403,7 @@ function ShopState:drawDiceSection(player, W, H)
 
         self._dice_buttons[i] = { x = item_x, y = iy, w = item_w, h = 72, hovered = hovered }
 
-        if shop_mode == "grid" and shop_col == 2 and shop_row == i and not replacing_die then
+        if shop_mode == "grid" and shop_col == 1 and shop_row == i and not replacing_die then
             UI.drawFocusRect(item_x, iy + ch.lift, item_w, 72)
         end
     end
@@ -380,8 +416,8 @@ function ShopState:drawDiceSection(player, W, H)
 end
 
 function ShopState:drawItemsSection(player, W, H)
-    local sa = section_anims[3] or { y_off = 0, alpha = 1 }
-    local section_x = 2 * W / 3 + 10
+    local sa = section_anims[2] or { y_off = 0, alpha = 1 }
+    local section_x = W / 3 + 5
     local section_y = 160 + sa.y_off
     local section_w = W / 3 - 30
     local section_h = H - 250
@@ -437,7 +473,7 @@ function ShopState:drawItemsSection(player, W, H)
 
         self._item_buttons[i] = { x = item_x, y = iy, w = item_w, h = 60, hovered = hovered }
 
-        if shop_mode == "grid" and shop_col == 3 and shop_row == i and not replacing_die then
+        if shop_mode == "grid" and shop_col == 2 and shop_row == i and not replacing_die then
             UI.drawFocusRect(item_x, iy + ch.lift, item_w, 60)
         end
     end
@@ -576,19 +612,6 @@ function ShopState:mousepressed(x, y, button, player)
         return nil
     end
 
-    for i, btn in pairs(self._hand_upgrade_buttons or {}) do
-        if btn.hovered then
-            local ok, msg = shop:buyHandUpgrade(player, i)
-            if ok then
-                Toast.success(msg)
-                Particles.sparkle(x, y, UI.colors.accent, 12)
-            else
-                Toast.error(msg)
-            end
-            return nil
-        end
-    end
-
     for i, btn in pairs(self._dice_buttons or {}) do
         if btn.hovered then
             replacing_die = true
@@ -603,6 +626,19 @@ function ShopState:mousepressed(x, y, button, player)
             if ok then
                 Toast.success(msg)
                 Particles.sparkle(x, y, UI.colors.green_light, 15)
+            else
+                Toast.error(msg)
+            end
+            return nil
+        end
+    end
+
+    for i, btn in pairs(self._hand_ref_buttons or {}) do
+        if btn.hovered and btn.upgrade_idx then
+            local ok, msg = shop:buyHandUpgrade(player, btn.upgrade_idx)
+            if ok then
+                Toast.success(msg)
+                Particles.sparkle(x, y, UI.colors.accent, 12)
             else
                 Toast.error(msg)
             end
@@ -686,16 +722,24 @@ function ShopState:keypressed(key, player)
                 shop_mode = "continue"
             end
         elseif key == "return" or key == "space" then
-            if shop_col == 1 and shop_row >= 1 and shop_row <= #shop.hand_upgrades then
-                local ok, msg = shop:buyHandUpgrade(player, shop_row)
-                if ok then Toast.success(msg) else Toast.error(msg) end
-            elseif shop_col == 2 and shop_row >= 1 and shop_row <= #shop.dice_inventory then
+            if shop_col == 1 and shop_row >= 1 and shop_row <= #shop.dice_inventory then
                 replacing_die = true
                 selected_shop_die = shop_row
                 replace_focus = 1
-            elseif shop_col == 3 and shop_row >= 1 and shop_row <= #shop.items_inventory then
+            elseif shop_col == 2 and shop_row >= 1 and shop_row <= #shop.items_inventory then
                 local ok, msg = shop:buyItem(player, shop_row)
                 if ok then Toast.success(msg) else Toast.error(msg) end
+            elseif shop_col == 3 and shop_row >= 1 and shop_row <= #shop_visible_hands then
+                local hand = shop_visible_hands[shop_row]
+                if hand then
+                    for idx, upgrade in ipairs(shop.hand_upgrades) do
+                        if upgrade.hand == hand then
+                            local ok, msg = shop:buyHandUpgrade(player, idx)
+                            if ok then Toast.success(msg) else Toast.error(msg) end
+                            break
+                        end
+                    end
+                end
             end
         elseif key == "tab" then
             shop_mode = "continue"

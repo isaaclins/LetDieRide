@@ -168,7 +168,7 @@ function Player:getTargetScore()
     return math.floor(base * (scaling ^ (self.round - 1)))
 end
 
-function Player:earnCurrency()
+function Player:earnCurrency(score)
     local breakdown = {}
     local total = 0
 
@@ -176,6 +176,12 @@ function Player:earnCurrency()
     local base = math.max(5, math.floor(target / 8))
     table.insert(breakdown, { label = "Round Reward", amount = base })
     total = total + base
+
+    if score and score >= target * 2 then
+        local bonus = math.floor(score / 10)
+        table.insert(breakdown, { label = "Overkill Bonus (2x+)", amount = bonus })
+        total = total + bonus
+    end
 
     if self.rerolls_remaining > 0 then
         table.insert(breakdown, {

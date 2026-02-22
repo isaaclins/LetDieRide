@@ -1165,7 +1165,7 @@ local function doScore(self, player)
     score_panel_anim = { alpha = 0, scale = 0.8 }
     selected_die_index = nil
     if score >= player:getTargetScore() then
-        currency_earned, currency_breakdown = player:earnCurrency()
+        currency_earned, currency_breakdown = player:earnCurrency(score)
         local earn_context = { player = player, phase = "earn", currency_breakdown = currency_breakdown }
         player:applyItems(earn_context)
         currency_earned = 0

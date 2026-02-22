@@ -13,16 +13,22 @@ end
 function Shop:generate(player, all_dice_types, all_items)
     self.free_choice_used = player.free_choice_used
 
-    self.hand_upgrades = {}
+    local all_upgradeable = {}
     local dice_count = #player.dice_pool
     for i, hand in ipairs(player.hands) do
         if hand.upgrade_level < hand.max_upgrade and (hand.min_dice or 1) <= dice_count then
-            table.insert(self.hand_upgrades, {
+            table.insert(all_upgradeable, {
                 hand_index = i,
                 hand = hand,
                 cost = hand:getUpgradeCost(),
             })
         end
+    end
+    self.hand_upgrades = {}
+    for i = 1, math.min(5, #all_upgradeable) do
+        local idx = RNG.random(1, #all_upgradeable)
+        table.insert(self.hand_upgrades, all_upgradeable[idx])
+        table.remove(all_upgradeable, idx)
     end
 
     self.dice_inventory = {}
