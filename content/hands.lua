@@ -114,6 +114,13 @@ local function createHands()
             priority = 16,
             description = "Seven dice of the same value",
         }),
+        Hand:new({
+            name = "Pyramid",
+            base_score = 200,
+            multiplier = 10,
+            priority = 17,
+            description = "1×two, 3×fours, 5×sixes (9 dice)",
+        }),
     }
 end
 

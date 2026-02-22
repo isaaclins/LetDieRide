@@ -20,10 +20,14 @@ local ShopState = require("states/shop_state")
 local GameOverState = require("states/game_over")
 local PauseState = require("states/pause")
 local SettingsState = require("states/settings")
+local Tutorial = require("states/tutorial")
+local DevMenu = require("states/devmenu")
 
 local state = "splash"
 local paused = false
 local unfocused = false
+local tutorial_active = false
+local devmenu_open = false
 local player = nil
 local all_dice_types = nil
 local all_items = nil
@@ -49,6 +53,7 @@ local function clearMuffle()
 end
 
 local function saveGame()
+    if tutorial_active then return end
     if player and (state == "round" or state == "shop") then
         SaveLoad.save(state, player, RNG.getState())
     end
@@ -205,6 +210,17 @@ function love.update(dt)
     elseif state == "game_over" then
         GameOverState:update(dt)
     end
+
+    if tutorial_active then
+        Tutorial:update(dt)
+        if Tutorial:isCompleted() then
+            tutorial_active = false
+            Transition.fadeTo(function()
+                state = "splash"
+                Splash:init()
+            end, 0.25)
+        end
+    end
 end
 
 function love.draw()
@@ -229,8 +245,21 @@ function love.draw()
         GameOverState:draw(player)
     end
 
+    if state == "splash" and not devmenu_open then
+        local W, H = love.graphics.getDimensions()
+        DevMenu:drawButton(W, H)
+    end
+
     if paused and state ~= "settings" then
         PauseState:draw()
+    end
+
+    if devmenu_open and state == "splash" then
+        DevMenu:draw()
+    end
+
+    if tutorial_active then
+        Tutorial:draw()
     end
 
     Particles.draw()
@@ -253,9 +282,33 @@ function love.mousepressed(x, y, button)
     if Transition.isActive() then return end
     if unfocused and Settings.get("pause_on_unfocus") then return end
 
+    if tutorial_active then
+        local consumed = Tutorial:mousepressed(x, y, button)
+        if Tutorial:isCompleted() then return end
+        if consumed then return end
+        if Tutorial:shouldBlockInput() then return end
+    end
+
     if state == "settings" then
         local result = SettingsState:mousepressed(x, y, button)
         handleResult(result)
+        return
+    end
+
+    if devmenu_open and state == "splash" then
+        local result = DevMenu:mousepressed(x, y, button)
+        if result == "close" then
+            devmenu_open = false
+        elseif result == "start_debug" then
+            devmenu_open = false
+            handleResult("dev_start_game")
+        end
+        return
+    end
+
+    if state == "splash" and DevMenu:isButtonClicked(x, y) then
+        devmenu_open = true
+        DevMenu:open()
         return
     end
 
@@ -292,9 +345,27 @@ function love.keypressed(key)
     if Transition.isActive() then return end
     if unfocused and Settings.get("pause_on_unfocus") then return end
 
+    if tutorial_active then
+        local consumed = Tutorial:keypressed(key)
+        if Tutorial:isCompleted() then return end
+        if consumed then return end
+        if Tutorial:shouldBlockInput() then return end
+    end
+
     if state == "settings" then
         local result = SettingsState:keypressed(key)
         handleResult(result)
+        return
+    end
+
+    if devmenu_open and state == "splash" then
+        local result = DevMenu:keypressed(key)
+        if result == "close" then
+            devmenu_open = false
+        elseif result == "start_debug" then
+            devmenu_open = false
+            handleResult("dev_start_game")
+        end
         return
     end
 
@@ -323,7 +394,7 @@ function love.keypressed(key)
         return
     end
 
-    if key == "escape" and (state == "round" or state == "shop") then
+    if key == "escape" and (state == "round" or state == "shop") and not tutorial_active then
         paused = true
         applyMuffle()
         return
@@ -362,7 +433,13 @@ end
 function handleResult(result)
     if not result then return end
 
-    if result == "start_game" then
+    if result == "tutorial" then
+        Transition.fadeTo(function()
+            tutorial_active = true
+            initNewGame("TUTORIAL")
+            Tutorial:init()
+        end, 0.25)
+    elseif result == "start_game" then
         Transition.fadeTo(function()
             state = "seed_input"
             SeedInput:init()
@@ -398,6 +475,25 @@ function handleResult(result)
             state = "splash"
             Splash:init()
         end
+    elseif result == "dev_start_game" then
+        Transition.fadeTo(function()
+            SaveLoad.deleteSave()
+            local seed = "DEBUG"
+            current_seed = seed
+            RNG.setSeed(seed)
+
+            local draft = DevMenu:getDraft()
+            player = draft
+            player.seed = seed
+            all_dice_types = createDiceTypes()
+            all_items = createItems()
+            all_bosses = createBosses()
+
+            current_boss = DevMenu:getSelectedBoss()
+            paused = false
+            state = "round"
+            RoundState:init(player, current_boss)
+        end, 0.25)
     elseif result == "exit" then
         love.event.quit()
     elseif result == "to_shop" then
@@ -409,8 +505,15 @@ function handleResult(result)
             state = "shop"
             ShopState:init(player, all_dice_types, all_items)
             saveGame()
+            if tutorial_active then
+                Tutorial:notifyStateChange("shop")
+            end
         end, 0.25)
     elseif result == "next_round" then
+        if tutorial_active then
+            Tutorial:notifyAction("continue")
+            return
+        end
         Transition.fadeTo(function()
             player.round = player.round + 1
             state = "round"

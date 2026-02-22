@@ -58,7 +58,7 @@ function Splash:init()
     Tween.to(subtitle_anim, 1.2, { chars = #subtitle_text }, "outCubic")
 
     button_anims = {}
-    local btn_count = has_save and 4 or 3
+    local btn_count = has_save and 5 or 4
     for i = 1, btn_count do
         local ba = { alpha = 0, y_off = 30 }
         button_anims[i] = ba
@@ -190,23 +190,33 @@ function Splash:draw()
     btn_idx = btn_idx + 1
 
     focus_idx = focus_idx + 1
+    splash_actions[focus_idx] = "tutorial"
+    ba = button_anims[btn_idx] or { alpha = 1, y_off = 0 }
+    self._tutorial_hovered = UI.drawButton(
+        "TUTORIAL", btn_x, btn_y + 68 + ba.y_off, btn_w, btn_h,
+        { font = Fonts.get(26), color = UI.colors.blue, hover_color = UI.colors.blue_hover }
+    )
+    if splash_focus == focus_idx then UI.drawFocusRect(btn_x, btn_y + 68 + ba.y_off, btn_w, btn_h) end
+    btn_idx = btn_idx + 1
+
+    focus_idx = focus_idx + 1
     splash_actions[focus_idx] = "open_settings"
     ba = button_anims[btn_idx] or { alpha = 1, y_off = 0 }
     self._settings_hovered = UI.drawButton(
-        "SETTINGS", btn_x, btn_y + 68 + ba.y_off, btn_w, btn_h,
+        "SETTINGS", btn_x, btn_y + 136 + ba.y_off, btn_w, btn_h,
         { font = Fonts.get(26), color = UI.colors.panel_light, hover_color = UI.colors.panel_hover }
     )
-    if splash_focus == focus_idx then UI.drawFocusRect(btn_x, btn_y + 68 + ba.y_off, btn_w, btn_h) end
+    if splash_focus == focus_idx then UI.drawFocusRect(btn_x, btn_y + 136 + ba.y_off, btn_w, btn_h) end
     btn_idx = btn_idx + 1
 
     focus_idx = focus_idx + 1
     splash_actions[focus_idx] = "exit"
     ba = button_anims[btn_idx] or { alpha = 1, y_off = 0 }
     self._exit_hovered = UI.drawButton(
-        "EXIT", btn_x, btn_y + 136 + ba.y_off, btn_w, btn_h,
+        "EXIT", btn_x, btn_y + 204 + ba.y_off, btn_w, btn_h,
         { font = Fonts.get(26), color = UI.colors.red, hover_color = { 0.95, 0.30, 0.30, 1 } }
     )
-    if splash_focus == focus_idx then UI.drawFocusRect(btn_x, btn_y + 136 + ba.y_off, btn_w, btn_h) end
+    if splash_focus == focus_idx then UI.drawFocusRect(btn_x, btn_y + 204 + ba.y_off, btn_w, btn_h) end
 
     splash_btn_count = focus_idx
 
@@ -221,6 +231,8 @@ function Splash:mousepressed(x, y, button)
             return "continue_game"
         elseif self._new_game_hovered then
             return "start_game"
+        elseif self._tutorial_hovered then
+            return "tutorial"
         elseif self._settings_hovered then
             return "open_settings"
         elseif self._exit_hovered then

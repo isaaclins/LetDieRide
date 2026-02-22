@@ -11,6 +11,8 @@ function Hand:init(opts)
     self.priority = opts.priority or 0
     self.detect = opts.detect or function() return false, {} end
     self.description = opts.description or ""
+    self._original_base = self.base_score
+    self._original_mult = self.multiplier
 end
 
 function Hand:calculateScore(dice_values, matched_dice)
@@ -36,6 +38,13 @@ end
 
 function Hand:getDisplayScore()
     return self.base_score .. " × " .. string.format("%.1f", self.multiplier)
+end
+
+function Hand:setUpgradeLevel(level)
+    self.base_score = self._original_base
+    self.multiplier = self._original_mult
+    self.upgrade_level = 0
+    for _ = 1, level do self:upgrade() end
 end
 
 return Hand

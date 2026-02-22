@@ -128,7 +128,7 @@ function UI.drawButton(text, x, y, w, h, opts)
     return hovered
 end
 
-function UI.drawDie(x, y, size, value, dot_color, body_color, locked, hovered, special_glow)
+function UI.drawDie(x, y, size, value, dot_color, body_color, locked, hovered, special_glow, boss_locked)
     local r = size * 0.15
 
     UI.drawShadow(x, y, size, size, r, 3)
@@ -168,7 +168,46 @@ function UI.drawDie(x, y, size, value, dot_color, body_color, locked, hovered, s
         love.graphics.circle("fill", dx, dy, dot_r)
     end
 
-    if locked then
+    if locked and boss_locked then
+        love.graphics.setColor(0.12, 0.05, 0.18, 0.25)
+        UI.roundRect("fill", x, y, size, size, r)
+
+        love.graphics.setLineWidth(2.5)
+        love.graphics.setColor(0.58, 0.30, 0.85, 0.8)
+        UI.roundRect("line", x, y, size, size, r)
+        love.graphics.setLineWidth(1)
+
+        local Fonts = require("functions/fonts")
+        local prev_font = love.graphics.getFont()
+        local q_font_size = math.floor(size * 0.55)
+        local q_font = Fonts.get(q_font_size)
+        love.graphics.setFont(q_font)
+
+        local q_text = "?"
+        local q_w = q_font:getWidth(q_text)
+        local q_h = q_font:getHeight()
+        local q_x = x + size / 2 - q_w / 2
+        local t = love.timer.getTime()
+        local bob = math.sin(t * 2.5) * 3
+        local q_y = y - q_h - 4 + bob
+
+        for i = 3, 1, -1 do
+            local a = 0.12 * (1 - (i - 1) / 3)
+            love.graphics.setColor(0.58, 0.30, 0.85, a)
+            love.graphics.print(q_text, q_x - i, q_y - i)
+            love.graphics.print(q_text, q_x + i, q_y - i)
+            love.graphics.print(q_text, q_x - i, q_y + i)
+            love.graphics.print(q_text, q_x + i, q_y + i)
+        end
+
+        love.graphics.setColor(0, 0, 0, 0.5)
+        love.graphics.print(q_text, q_x + 1, q_y + 1)
+
+        love.graphics.setColor(0.70, 0.40, 0.95, 0.95)
+        love.graphics.print(q_text, q_x, q_y)
+
+        love.graphics.setFont(prev_font)
+    elseif locked then
         love.graphics.setColor(0, 0, 0, 0.18)
         UI.roundRect("fill", x, y, size, size, r)
 
@@ -287,6 +326,64 @@ function UI.drawFocusRect(x, y, w, h, r)
     love.graphics.setColor(1.0, 0.84, 0, 0.6 + 0.3 * pulse)
     UI.roundRect("line", x - 3, y - 3, w + 6, h + 6, (r or 8) + 1)
     love.graphics.setLineWidth(1)
+end
+
+function UI.drawSpotlight(hx, hy, hw, hh, dim_alpha, radius)
+    dim_alpha = dim_alpha or 0.7
+    radius = radius or 10
+    local W, H = love.graphics.getDimensions()
+
+    love.graphics.stencil(function()
+        UI.roundRect("fill", hx, hy, hw, hh, radius)
+    end, "replace", 1)
+
+    love.graphics.setStencilTest("equal", 0)
+    love.graphics.setColor(0, 0, 0, dim_alpha)
+    love.graphics.rectangle("fill", 0, 0, W, H)
+    love.graphics.setStencilTest()
+
+    local t = love.timer.getTime()
+    local pulse = 0.5 + 0.5 * math.sin(t * 3)
+    love.graphics.setLineWidth(2.5)
+    love.graphics.setColor(1.0, 0.84, 0.0, 0.5 + 0.3 * pulse)
+    UI.roundRect("line", hx - 2, hy - 2, hw + 4, hh + 4, radius + 1)
+    love.graphics.setLineWidth(1)
+end
+
+function UI.drawTutorialPanel(x, y, w, title, body, opts)
+    opts = opts or {}
+    local Fonts = require("functions/fonts")
+    local title_font = opts.title_font or Fonts.get(20)
+    local body_font = opts.body_font or Fonts.get(15)
+    local pad = 14
+    local arrow_text = opts.arrow_text or "Click to continue"
+
+    local _, title_wraps = title_font:getWrap(title, w - pad * 2)
+    local title_h = #title_wraps * title_font:getHeight()
+    local _, body_wraps = body_font:getWrap(body, w - pad * 2)
+    local body_h = #body_wraps * body_font:getHeight()
+
+    local arrow_font = Fonts.get(12)
+    local arrow_h = arrow_font:getHeight() + 8
+    local h = pad + title_h + 8 + body_h + 8 + arrow_h + pad
+
+    UI.drawPanel(x, y, w, h, { border = UI.colors.accent, border_width = 2 })
+
+    love.graphics.setFont(title_font)
+    UI.setColor(UI.colors.accent)
+    love.graphics.printf(title, x + pad, y + pad, w - pad * 2, "left")
+
+    love.graphics.setFont(body_font)
+    UI.setColor(UI.colors.text)
+    love.graphics.printf(body, x + pad, y + pad + title_h + 8, w - pad * 2, "left")
+
+    love.graphics.setFont(arrow_font)
+    local t = love.timer.getTime()
+    local blink = 0.4 + 0.4 * math.sin(t * 3)
+    love.graphics.setColor(UI.colors.text_dim[1], UI.colors.text_dim[2], UI.colors.text_dim[3], blink)
+    love.graphics.printf(arrow_text, x + pad, y + h - pad - arrow_font:getHeight(), w - pad * 2, "right")
+
+    return h
 end
 
 return UI

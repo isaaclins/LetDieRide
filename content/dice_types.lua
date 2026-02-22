@@ -97,7 +97,9 @@ local function createDiceTypes()
                 if context and context.dice_pool and #context.dice_pool > 1 then
                     local others = {}
                     for _, d in ipairs(context.dice_pool) do
-                        if d ~= self then table.insert(others, d) end
+                        if d ~= self and d.die_type ~= "echo" then
+                            table.insert(others, d)
+                        end
                     end
                     if #others > 0 then
                         local target = others[RNG.random(1, #others)]

@@ -10,15 +10,16 @@ local function createBosses()
             modifier = function(self, context)
                 if context and context.player and #context.player.dice_pool > 0 then
                     local idx = RNG.random(1, #context.player.dice_pool)
-                    context.player.dice_pool[idx].locked = true
-                    context.player.dice_pool[idx].value = RNG.random(1, 6)
-                    context.locked_by_boss = idx
+                    local die = context.player.dice_pool[idx]
+                    die.locked = true
+                    die.value = RNG.random(1, 6)
+                    context.boss_locked_die = die
                 end
             end,
             revert = function(self, context)
-                if context and context.locked_by_boss and context.player then
-                    local die = context.player.dice_pool[context.locked_by_boss]
-                    if die then die.locked = false end
+                if context and context.boss_locked_die then
+                    context.boss_locked_die.locked = false
+                    context.boss_locked_die = nil
                 end
             end,
         }),

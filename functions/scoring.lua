@@ -96,6 +96,12 @@ function Scoring.detectHand(values)
         end
     end
 
+    -- Pyramid: exactly 1×2, 3×4, 5×6
+    if n >= 9 and (counts[2] or 0) >= 1 and (counts[4] or 0) >= 3 and (counts[6] or 0) >= 5 then
+        local matched = { 2, 4, 4, 4, 6, 6, 6, 6, 6 }
+        return "Pyramid", matched
+    end
+
     -- Five of a Kind
     if max_count >= 5 then
         return "Five of a Kind", values

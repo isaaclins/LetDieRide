@@ -5,6 +5,7 @@ local Tween = require("functions/tween")
 local Particles = require("functions/particles")
 local Toast = require("functions/toast")
 local Settings = require("functions/settings")
+local Tutorial = require("states/tutorial")
 
 local Round = {}
 
@@ -66,6 +67,7 @@ local function resetDieAnims(player)
             lock_flash = 0,
             bounce = 0,
             pop_scale = 1,
+            echo_flash = 0,
         }
     end
 end
@@ -140,6 +142,7 @@ function Round:update(dt, player)
             da.lock_flash = math.max(0, da.lock_flash - dt * 4)
             da.bounce = da.bounce * math.max(0, 1 - dt * 6)
             da.pop_scale = da.pop_scale + (1.0 - da.pop_scale) * math.min(1, 8 * dt)
+            da.echo_flash = math.max(0, (da.echo_flash or 0) - dt * 1.8)
         end
     end
 
@@ -160,21 +163,27 @@ function Round:update(dt, player)
                     if not die.locked then die.value = 7 - die.value end
                 end
             end
-            for _, die in ipairs(player.dice_pool) do
+            for i, die in ipairs(player.dice_pool) do
                 if die.die_type == "echo" and die.ability then
-                    die:triggerAbility({ dice_pool = player.dice_pool })
+                    local result = die:triggerAbility({ dice_pool = player.dice_pool })
+                    if result == "echo" and die_anims[i] then
+                        die_anims[i].echo_flash = 1.0
+                        die_anims[i].pop_scale = 1.2
+                        die_anims[i].bounce = 8
+                    end
                 end
             end
 
             for i, da in ipairs(die_anims) do
-                da.bounce = 6
-                da.pop_scale = 1.12
+                da.bounce = math.max(da.bounce, 6)
+                da.pop_scale = math.max(da.pop_scale, 1.12)
             end
 
             sub_state = "choosing"
             self:applySortMode(player)
             self:updatePreview(player)
             self:slideInPanels()
+            if Tutorial:isActive() then Tutorial:notifySubState("choosing") end
         end
     elseif sub_state == "rerolling" then
         local all_done = player:updateDiceRolls(dt)
@@ -182,6 +191,16 @@ function Round:update(dt, player)
             if boss_context and boss_context.invert_dice then
                 for _, die in ipairs(player.dice_pool) do
                     if not die.locked then die.value = 7 - die.value end
+                end
+            end
+            for i, die in ipairs(player.dice_pool) do
+                if not die.locked and die.die_type == "echo" and die.ability then
+                    local result = die:triggerAbility({ dice_pool = player.dice_pool })
+                    if result == "echo" and die_anims[i] then
+                        die_anims[i].echo_flash = 1.0
+                        die_anims[i].pop_scale = 1.2
+                        die_anims[i].bounce = 8
+                    end
                 end
             end
             for i, die in ipairs(player.dice_pool) do
@@ -199,6 +218,9 @@ function Round:update(dt, player)
         end
     elseif sub_state == "scoring" then
         score_display_timer = score_display_timer + dt
+        if Tutorial:isActive() then
+            Tutorial:notifySubState("scoring", { timer = score_display_timer })
+        end
     end
 end
 
@@ -465,7 +487,8 @@ function Round:drawDice(player, W, H)
             UI.roundRect("fill", draw_x - 6, draw_y - 6, s + 12, s + 12, s * 0.15 + 4)
         end
 
-        UI.drawDie(draw_x, draw_y, s, die.value, dot_color, nil, die.locked, hovered, die.glow_color)
+        local is_boss_locked = boss_context and boss_context.boss_locked_die == die
+        UI.drawDie(draw_x, draw_y, s, die.value, dot_color, nil, die.locked, hovered, die.glow_color, is_boss_locked)
 
         if is_selected then
             local pulse = 0.5 + 0.5 * math.sin(t * 4)
@@ -478,6 +501,19 @@ function Round:drawDice(player, W, H)
         if da.lock_flash > 0 then
             love.graphics.setColor(1, 0.3, 0.3, da.lock_flash * 0.3)
             UI.roundRect("fill", draw_x, draw_y, s, s, s * 0.15)
+        end
+
+        if (da.echo_flash or 0) > 0 then
+            local ef = da.echo_flash
+            local ring_expand = (1 - ef) * s * 0.4
+            love.graphics.setColor(0.3, 0.7, 0.9, ef * 0.5)
+            UI.roundRect("fill", draw_x - ring_expand / 2, draw_y - ring_expand / 2,
+                s + ring_expand, s + ring_expand, s * 0.15 + ring_expand * 0.3)
+            love.graphics.setLineWidth(2)
+            love.graphics.setColor(0.3, 0.7, 0.9, ef * 0.8)
+            UI.roundRect("line", draw_x - ring_expand / 2, draw_y - ring_expand / 2,
+                s + ring_expand, s + ring_expand, s * 0.15 + ring_expand * 0.3)
+            love.graphics.setLineWidth(1)
         end
 
         love.graphics.setFont(Fonts.get(layout.label_font))
@@ -493,7 +529,7 @@ function Round:drawDice(player, W, H)
             local show_for_hover = hovered
             local show_for_select = is_selected and tooltip_visible
             if show_for_hover or show_for_select then
-                tooltip_die = { die = die, index = i, matched = die_matched[i] }
+                tooltip_die = { die = die, index = i, matched = die_matched[i], boss_locked = is_boss_locked }
                 tooltip_dx = draw_x
                 tooltip_dy = draw_y
                 tooltip_s = s
@@ -574,8 +610,13 @@ function Round:drawDieTooltip(info, dx, dy, s, W, H)
     love.graphics.printf("Value: " .. die.value, tip_x + pad, ly, tip_w - pad * 2, "left")
 
     if die.locked then
-        UI.setColor(UI.colors.red)
-        love.graphics.printf("LOCKED", tip_x + pad, ly, tip_w - pad * 2, "right")
+        if info.boss_locked then
+            UI.setColor(UI.colors.purple)
+            love.graphics.printf("BOSS LOCKED", tip_x + pad, ly, tip_w - pad * 2, "right")
+        else
+            UI.setColor(UI.colors.red)
+            love.graphics.printf("LOCKED", tip_x + pad, ly, tip_w - pad * 2, "right")
+        end
     end
     ly = ly + 18
 
@@ -607,6 +648,7 @@ local hand_examples = {
     ["Full Run"]        = { 1, 2, 3, 4, 5, 6 },
     ["Six of a Kind"]   = { 3, 3, 3, 3, 3, 3 },
     ["Seven of a Kind"] = { 6, 6, 6, 6, 6, 6, 6 },
+    ["Pyramid"]         = { 2, 4, 4, 4, 6, 6, 6, 6, 6 },
 }
 
 function Round:drawHandReference(player, W, H)
@@ -993,12 +1035,12 @@ function Round:calculateScore(player)
 end
 
 local function doLockDie(self, player, idx)
-    if boss_context and boss_context.locked_by_boss == idx then
+    local die = player.dice_pool[idx]
+    if not die then return end
+    if boss_context and boss_context.boss_locked_die == die then
         Toast.error("Boss locked this die!")
         return
     end
-    local die = player.dice_pool[idx]
-    if not die then return end
 
     if die.die_type == "wild" and not die.locked then
         wild_selecting = true
@@ -1013,12 +1055,14 @@ local function doLockDie(self, player, idx)
         da.lock_flash = 1.0
     end
     self:updatePreview(player)
+    if Tutorial:isActive() then Tutorial:notifyAction("lock") end
 end
 
 local function doReroll(player)
     if player.rerolls_remaining <= 0 then return false end
     player:rerollUnlocked()
     sub_state = "rerolling"
+    if Tutorial:isActive() then Tutorial:notifyAction("reroll") end
     return true
 end
 
@@ -1033,6 +1077,7 @@ local function doScore(self, player)
         local earn_context = { player = player, phase = "earn" }
         player:applyItems(earn_context)
     end
+    if Tutorial:isActive() then Tutorial:notifyAction("score") end
 end
 
 local function cycleSortMode(self, player)
@@ -1206,6 +1251,10 @@ end
 
 function Round:getBossContext()
     return boss_context
+end
+
+function Round:setBossContext(ctx)
+    boss_context = ctx
 end
 
 return Round

@@ -325,24 +325,34 @@ function ShopState:drawDiceSection(player, W, H)
         setCardHoverState(key, hovered)
         local ch = getCardHover(key)
 
+        local entry_affordable = not shop.free_choice_used and true or player.currency >= entry.cost
+
         if ch.shadow > 0.5 then
             love.graphics.setColor(0, 0, 0, 0.15)
             UI.roundRect("fill", item_x + 2, iy + ch.shadow + 2, item_w, 72, 6)
         end
-        UI.setColor(hovered and UI.colors.panel_hover or UI.colors.panel_light)
+        if entry_affordable then
+            UI.setColor(hovered and UI.colors.panel_hover or UI.colors.panel_light)
+        else
+            local bg = UI.colors.panel_light
+            love.graphics.setColor(bg[1], bg[2], bg[3], (bg[4] or 1) * 0.5)
+        end
         UI.roundRect("fill", item_x, iy + ch.lift, item_w, 72, 6)
 
         local die = entry.die
         local die_size = 40
+        local can_afford = shop.free_choice_used == false or player.currency >= entry.cost
+        local dim = (not can_afford) and 0.4 or 1.0
         local dot_color = die_colors_map[die.color] or UI.colors.die_black
-        UI.drawDie(item_x + 8, iy + 8 + ch.lift, die_size, die.value, dot_color, nil, false, false, die.glow_color)
+        love.graphics.setColor(dot_color[1], dot_color[2], dot_color[3], dim)
+        UI.drawDie(item_x + 8, iy + 8 + ch.lift, die_size, die.value, {dot_color[1], dot_color[2], dot_color[3], dim}, nil, false, false, die.glow_color)
 
         love.graphics.setFont(Fonts.get(14))
-        UI.setColor(UI.colors.text)
+        love.graphics.setColor(UI.colors.text[1], UI.colors.text[2], UI.colors.text[3], dim)
         love.graphics.print(die.name, item_x + 56, iy + 6 + ch.lift)
 
         love.graphics.setFont(Fonts.get(11))
-        UI.setColor(UI.colors.text_dim)
+        love.graphics.setColor(UI.colors.text_dim[1], UI.colors.text_dim[2], UI.colors.text_dim[3], dim)
         love.graphics.printf(die.ability_desc, item_x + 56, iy + 24 + ch.lift, item_w - 64)
 
         if not shop.free_choice_used then
@@ -350,7 +360,7 @@ function ShopState:drawDiceSection(player, W, H)
             love.graphics.setFont(Fonts.get(14))
             love.graphics.printf("FREE", item_x, iy + 8 + ch.lift, item_w - 8, "right")
         else
-            UI.setColor(UI.colors.accent)
+            UI.setColor(can_afford and UI.colors.accent or UI.colors.red)
             love.graphics.setFont(Fonts.get(14))
             love.graphics.printf("$" .. entry.cost, item_x, iy + 8 + ch.lift, item_w - 8, "right")
         end
@@ -398,22 +408,30 @@ function ShopState:drawItemsSection(player, W, H)
         setCardHoverState(key, hovered)
         local ch = getCardHover(key)
 
+        local can_afford = player.currency >= item.cost
+
         if ch.shadow > 0.5 then
             love.graphics.setColor(0, 0, 0, 0.15)
             UI.roundRect("fill", item_x + 2, iy + ch.shadow + 2, item_w, 60, 6)
         end
-        UI.setColor(hovered and UI.colors.panel_hover or UI.colors.panel_light)
+        if can_afford then
+            UI.setColor(hovered and UI.colors.panel_hover or UI.colors.panel_light)
+        else
+            local bg = UI.colors.panel_light
+            love.graphics.setColor(bg[1], bg[2], bg[3], (bg[4] or 1) * 0.5)
+        end
         UI.roundRect("fill", item_x, iy + ch.lift, item_w, 60, 6)
+        local dim = can_afford and 1.0 or 0.4
 
         love.graphics.setFont(Fonts.get(14))
-        UI.setColor(UI.colors.text)
+        love.graphics.setColor(UI.colors.text[1], UI.colors.text[2], UI.colors.text[3], dim)
         love.graphics.print("[" .. item.icon .. "] " .. item.name, item_x + 8, iy + 6 + ch.lift)
 
         love.graphics.setFont(Fonts.get(11))
-        UI.setColor(UI.colors.text_dim)
+        love.graphics.setColor(UI.colors.text_dim[1], UI.colors.text_dim[2], UI.colors.text_dim[3], dim)
         love.graphics.printf(item.description, item_x + 8, iy + 26 + ch.lift, item_w - 16)
 
-        UI.setColor(UI.colors.accent)
+        UI.setColor(can_afford and UI.colors.accent or UI.colors.red)
         love.graphics.setFont(Fonts.get(14))
         love.graphics.printf("$" .. item.cost, item_x, iy + 8 + ch.lift, item_w - 8, "right")
 
