@@ -11,12 +11,14 @@ local placeholder = "Leave empty for random seed"
 local input_pop = { scale = 1 }
 local title_anim = { alpha = 0, y_off = -20 }
 local start_glow = 0
+local text_selected = false
 
 function SeedInput:init()
     input_text = ""
     cursor_blink = 0
     input_pop = { scale = 1 }
     start_glow = 0
+    text_selected = false
     love.keyboard.setKeyRepeat(true)
 
     title_anim = { alpha = 0, y_off = -20 }
@@ -67,20 +69,28 @@ function SeedInput:draw()
 
     if #input_text > 0 then
         love.graphics.setFont(Fonts.get(24))
+        local font = Fonts.get(24)
+        local text_w = font:getWidth(input_text)
+        local text_y = box_y + (box_h - font:getHeight()) / 2
+
+        if text_selected then
+            love.graphics.setColor(0.25, 0.45, 0.85, 0.45)
+            UI.roundRect("fill", box_x + 14, text_y - 2, text_w + 4, font:getHeight() + 4, 3)
+        end
+
         UI.setColor(UI.colors.text)
-        love.graphics.printf(input_text, box_x + 16, box_y + (box_h - Fonts.get(24):getHeight()) / 2, box_w - 32, "left")
+        love.graphics.printf(input_text, box_x + 16, text_y, box_w - 32, "left")
+
+        if not text_selected then
+            local cursor_alpha = 0.5 + 0.5 * math.sin(cursor_blink * math.pi * 2)
+            love.graphics.setColor(1, 1, 1, cursor_alpha)
+            love.graphics.rectangle("fill", box_x + 16 + text_w, box_y + 10, 2, box_h - 20)
+        end
     else
         love.graphics.setFont(Fonts.get(16))
         UI.setColor(UI.colors.text_dark)
         love.graphics.printf(placeholder, box_x + 16, box_y + (box_h - Fonts.get(16):getHeight()) / 2, box_w - 32, "center")
     end
-
-    local cursor_alpha = 0.5 + 0.5 * math.sin(cursor_blink * math.pi * 2)
-    local text_w = Fonts.get(24):getWidth(input_text)
-    love.graphics.setColor(1, 1, 1, cursor_alpha)
-    local cx = box_x + 16 + text_w
-    local cy = box_y + 10
-    love.graphics.rectangle("fill", cx, cy, 2, box_h - 20)
 
     love.graphics.pop()
 
@@ -98,6 +108,13 @@ function SeedInput:draw()
     self._start_hovered = UI.drawButton(
         start_label, btn_x, btn_y, btn_w, btn_h,
         { font = Fonts.get(20), color = UI.colors.green, hover_color = UI.colors.green_light }
+    )
+
+    local paste_btn_w = 80
+    local paste_gap = 10
+    self._paste_hovered = UI.drawButton(
+        "PASTE", btn_x + btn_w + paste_gap, btn_y, paste_btn_w, btn_h,
+        { font = Fonts.get(16), color = UI.colors.panel_light, hover_color = UI.colors.panel_hover }
     )
 
     self._back_hovered = UI.drawButton(
@@ -118,11 +135,24 @@ function SeedInput:getSeed()
     end
 end
 
+local function pasteClipboard()
+    local clip = love.system.getClipboardText() or ""
+    local filtered = clip:upper():gsub("[^A-Z0-9]", "")
+    if #filtered > 0 then
+        input_text = filtered:sub(1, 16)
+        input_pop.scale = 1.06
+    end
+end
+
 function SeedInput:mousepressed(x, y, button)
     if button ~= 1 then return nil end
+    text_selected = false
     if self._start_hovered then
         self:cleanup()
         return "confirm_seed"
+    elseif self._paste_hovered then
+        pasteClipboard()
+        return nil
     elseif self._back_hovered then
         self:cleanup()
         return "back_to_menu"
@@ -131,20 +161,48 @@ function SeedInput:mousepressed(x, y, button)
 end
 
 function SeedInput:keypressed(key)
+    local ctrl = love.keyboard.isDown("lgui") or love.keyboard.isDown("rgui")
+        or love.keyboard.isDown("lctrl") or love.keyboard.isDown("rctrl")
+
     if key == "return" then
+        text_selected = false
         self:cleanup()
         return "confirm_seed"
     elseif key == "escape" then
+        text_selected = false
         self:cleanup()
         return "back_to_menu"
     elseif key == "backspace" then
-        input_text = input_text:sub(1, -2)
+        if text_selected or ctrl then
+            input_text = ""
+            text_selected = false
+        else
+            input_text = input_text:sub(1, -2)
+        end
+    elseif key == "v" and ctrl then
+        text_selected = false
+        pasteClipboard()
+    elseif key == "a" and ctrl then
+        if #input_text > 0 then
+            text_selected = true
+        end
+    elseif key == "c" and ctrl then
+        if #input_text > 0 then
+            love.system.setClipboardText(input_text:upper())
+        end
     end
     return nil
 end
 
 function SeedInput:textinput(text)
     local filtered = text:upper():gsub("[^A-Z0-9]", "")
+    if #filtered == 0 then return end
+
+    if text_selected then
+        input_text = ""
+        text_selected = false
+    end
+
     if #input_text + #filtered <= 16 then
         input_text = input_text .. filtered
         input_pop.scale = 1.06

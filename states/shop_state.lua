@@ -102,11 +102,11 @@ function ShopState:draw(player)
     self:drawContinueButton(W, H)
 
     if not replacing_die then
-        love.graphics.setFont(Fonts.get(12))
+        love.graphics.setFont(Fonts.get(11))
         UI.setColor(UI.colors.text_dark)
         love.graphics.printf(
             "Arrows: Navigate  |  Enter: Select  |  Tab: Continue  |  Esc: Pause",
-            0, H - 22, W, "center"
+            0, H - 13, W, "center"
         )
     end
 
