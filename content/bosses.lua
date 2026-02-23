@@ -21,7 +21,11 @@ local function createBosses()
                         table.remove(indices, pick)
                         local die = pool[idx]
                         die.locked = true
-                        die.value = RNG.random(1, 6)
+                        if die.die_type == "broken" then
+                            die.value = 1
+                        else
+                            die.value = RNG.random(1, 6)
+                        end
                         table.insert(context.boss_locked_dice, die)
                     end
                 end

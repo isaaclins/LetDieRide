@@ -53,9 +53,12 @@ function SaveLoad.serializeDie(die)
         color = die.color,
         die_type = die.die_type,
         value = die.value,
+        locked = die.locked or false,
+        wild_choice = die.wild_choice,
         ability_name = die.ability_name,
         ability_desc = die.ability_desc,
         upgrade_level = die.upgrade_level,
+        max_upgrade = die.max_upgrade,
         weights = {},
     }
     for i, w in ipairs(die.weights) do
@@ -76,22 +79,32 @@ function SaveLoad.serializeHand(hand)
         base_score = hand.base_score,
         multiplier = hand.multiplier,
         upgrade_level = hand.upgrade_level,
+        max_upgrade = hand.max_upgrade,
     }
 end
 
-function SaveLoad.buildSaveData(game_state, player, rng_state)
+function SaveLoad.buildSaveData(game_state, player, rng_state, current_boss_name)
     if not player then return nil end
     local data = {
-        version = 1,
+        version = 2,
         state = game_state,
         seed = player.seed or "",
         rng_state = rng_state or "",
         round = player.round,
         currency = player.currency,
+        score = player.score,
         base_rerolls = player.base_rerolls,
+        max_rerolls = player.max_rerolls,
+        rerolls_remaining = player.rerolls_remaining,
+        max_dice = player.max_dice,
+        free_choice_used = player.free_choice_used,
+        limit_break_count = player.limit_break_count,
+        interest_cap = player.interest_cap,
+        current_boss_name = current_boss_name,
         dice_pool = {},
         hands = {},
         item_names = {},
+        item_states = {},
     }
 
     for _, die in ipairs(player.dice_pool) do
@@ -104,13 +117,17 @@ function SaveLoad.buildSaveData(game_state, player, rng_state)
 
     for _, item in ipairs(player.items) do
         table.insert(data.item_names, item.name)
+        table.insert(data.item_states, {
+            name = item.name,
+            triggered_this_round = item.triggered_this_round or false,
+        })
     end
 
     return data
 end
 
-function SaveLoad.save(game_state, player, rng_state)
-    local data = SaveLoad.buildSaveData(game_state, player, rng_state)
+function SaveLoad.save(game_state, player, rng_state, current_boss_name)
+    local data = SaveLoad.buildSaveData(game_state, player, rng_state, current_boss_name)
     if not data then return false end
 
     local content = "return " .. serialize(data, 0) .. "\n"
@@ -142,7 +159,7 @@ function SaveLoad.load()
         return nil
     end
 
-    if data.version ~= 1 then
+    if data.version ~= 1 and data.version ~= 2 then
         print("[load] Incompatible save version")
         return nil
     end
@@ -161,7 +178,14 @@ function SaveLoad.restorePlayer(data, Player, Die, createDiceTypes, createItems,
     local player = Player:new()
     player.round = data.round or 1
     player.currency = data.currency or 0
+    player.score = data.score or 0
     player.base_rerolls = data.base_rerolls or 3
+    player.max_rerolls = data.max_rerolls or player.base_rerolls
+    player.rerolls_remaining = data.rerolls_remaining or player.max_rerolls
+    player.max_dice = data.max_dice or 5
+    player.free_choice_used = data.free_choice_used or false
+    player.limit_break_count = data.limit_break_count or 0
+    player.interest_cap = data.interest_cap or 5
 
     local templates = {}
     for _, dt in ipairs(createDiceTypes()) do
@@ -169,7 +193,7 @@ function SaveLoad.restorePlayer(data, Player, Die, createDiceTypes, createItems,
     end
 
     player.dice_pool = {}
-    for _, dd in ipairs(data.dice_pool or {}) do
+    for i, dd in ipairs(data.dice_pool or {}) do
         local template = templates[dd.die_type]
         local die = Die:new({
             name = dd.name,
@@ -179,9 +203,12 @@ function SaveLoad.restorePlayer(data, Player, Die, createDiceTypes, createItems,
             ability_name = dd.ability_name,
             ability_desc = dd.ability_desc,
             upgrade_level = dd.upgrade_level or 0,
+            max_upgrade = dd.max_upgrade or 3,
             weights = dd.weights,
             glow_color = dd.glow_color,
         })
+        die.locked = dd.locked or false
+        die.wild_choice = dd.wild_choice
         if template and template.ability then
             die.ability = template.ability
         end
@@ -213,6 +240,7 @@ function SaveLoad.restorePlayer(data, Player, Die, createDiceTypes, createItems,
     for _, hand in ipairs(base_hands) do
         local hd = saved_by_name[hand.name]
         if hd then
+            hand.max_upgrade = math.max(hand.max_upgrade, hd.max_upgrade or hand.max_upgrade)
             local lvl = hd.upgrade_level or 0
             if lvl > 0 then hand:setUpgradeLevel(lvl) end
         elseif hand.is_x_of_a_kind and merged_xoak_level > 0 then
@@ -226,10 +254,20 @@ function SaveLoad.restorePlayer(data, Player, Die, createDiceTypes, createItems,
     for _, item in ipairs(all_items) do
         item_lookup[item.name] = item
     end
+    local item_state_lookup = {}
+    for _, st in ipairs(data.item_states or {}) do
+        if st.name then
+            item_state_lookup[st.name] = st
+        end
+    end
     player.items = {}
     for _, name in ipairs(data.item_names or {}) do
         local item = item_lookup[name]
         if item then
+            local st = item_state_lookup[name]
+            if st then
+                item.triggered_this_round = st.triggered_this_round or false
+            end
             table.insert(player.items, item)
         end
     end

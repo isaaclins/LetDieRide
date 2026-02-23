@@ -192,17 +192,14 @@ The quadratic cost curve means early upgrades are cheap, but maxing a hand is ex
 ### Extra Die Slot Prices
 
 ```lua
-cost = 15 + extra² × 10
+cost = (pool_size - 4)^16
 ```
 
-Where `extra = max(0, current_pool_size - 5)`.
-
-| Pool Size | Buying Slot | Cost | Cumulative |
-|-----------|-------------|------|------------|
-| 5 | 6th die | $15 | $15 |
-| 6 | 7th die | $25 | $40 |
-| 7 | 8th die | $55 | $95 |
-| 8 | 9th die | $105 | $200 |
+| Pool Size | Buying Slot | Cost |
+|-----------|-------------|------|
+| 5 | 6th die | $1 |
+| 6 | 7th die | $65,536 |
+| 7 | 8th die | $43,046,721 |
 | 9 | 10th die | $175 | $375 |
 
 Maximum pool size is **10 dice**. Extra slots add a "Vanilla Die" (functionally identical to Normal Die).

@@ -57,7 +57,11 @@ end
 local function saveGame()
     if tutorial_active then return end
     if player and (state == "round" or state == "shop") then
-        SaveLoad.save(state, player, RNG.getState())
+        local saved_boss_name = nil
+        if state == "round" and current_boss then
+            saved_boss_name = current_boss.name
+        end
+        SaveLoad.save(state, player, RNG.getState(), saved_boss_name)
     end
 end
 
@@ -118,7 +122,17 @@ local function loadGame()
     else
         state = "round"
         if player:isBossRound() then
-            current_boss = all_bosses[RNG.random(1, #all_bosses)]
+            if data.current_boss_name then
+                for _, boss in ipairs(all_bosses) do
+                    if boss.name == data.current_boss_name then
+                        current_boss = boss
+                        break
+                    end
+                end
+            end
+            if not current_boss then
+                current_boss = all_bosses[RNG.random(1, #all_bosses)]
+            end
         end
         RoundState:init(player, current_boss)
     end

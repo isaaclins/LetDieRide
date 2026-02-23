@@ -9,8 +9,13 @@ function Scoring.getCounts(values)
 end
 
 local function countsKey(c)
-    return (c[1] or 0) .. "," .. (c[2] or 0) .. "," .. (c[3] or 0) .. ","
-        .. (c[4] or 0) .. "," .. (c[5] or 0) .. "," .. (c[6] or 0)
+    local k = (c[1] or 0)
+    k = k * 41 + (c[2] or 0)
+    k = k * 41 + (c[3] or 0)
+    k = k * 41 + (c[4] or 0)
+    k = k * 41 + (c[5] or 0)
+    k = k * 41 + (c[6] or 0)
+    return k
 end
 
 local function totalDice(c)
@@ -19,32 +24,26 @@ local function totalDice(c)
     return t
 end
 
-local function subtractMatched(c, matched)
-    local new = {}
-    for k, v in pairs(c) do new[k] = v end
-    for _, v in ipairs(matched) do
-        new[v] = (new[v] or 0) - 1
-        if new[v] <= 0 then new[v] = nil end
-    end
-    return new
-end
-
 local function generateExtractions(c, hand_lookup)
     local extractions = {}
     local n = totalDice(c)
 
     local xoak = hand_lookup["X of a Kind"]
 
-    -- X of a Kind (x >= 3)
+    -- X of a Kind (x >= 3): only try 3 and max to limit branching
     if xoak then
         for v = 1, 6 do
             local cv = c[v] or 0
             if cv >= 3 then
-                for x = 3, cv do
-                    local matched = {}
-                    for _ = 1, x do matched[#matched + 1] = v end
-                    local score = xoak:calculateXOfAKindScore(x, matched)
-                    extractions[#extractions + 1] = { hand = xoak, matched = matched, score = score }
+                local matched3 = {}
+                for _ = 1, 3 do matched3[#matched3 + 1] = v end
+                local score3 = xoak:calculateXOfAKindScore(3, matched3)
+                extractions[#extractions + 1] = { hand = xoak, matched = matched3, score = score3 }
+                if cv > 3 then
+                    local matched_max = {}
+                    for _ = 1, cv do matched_max[#matched_max + 1] = v end
+                    local score_max = xoak:calculateXOfAKindScore(cv, matched_max)
+                    extractions[#extractions + 1] = { hand = xoak, matched = matched_max, score = score_max }
                 end
             end
         end
@@ -208,45 +207,89 @@ local function generateExtractions(c, hand_lookup)
     return extractions
 end
 
+local function solveExact(c, memo, hand_lookup)
+    local key = countsKey(c)
+    if memo[key] then return memo[key] end
+
+    local extractions = generateExtractions(c, hand_lookup)
+
+    local best_score = 0
+    local best_combo = {}
+
+    for _, ext in ipairs(extractions) do
+        for _, v in ipairs(ext.matched) do
+            c[v] = (c[v] or 0) - 1
+        end
+
+        local sub = solveExact(c, memo, hand_lookup)
+        local total = ext.score + sub.score
+
+        for _, v in ipairs(ext.matched) do
+            c[v] = (c[v] or 0) + 1
+        end
+
+        if total > best_score then
+            best_score = total
+            best_combo = { { hand = ext.hand, matched = ext.matched, score = ext.score } }
+            for _, entry in ipairs(sub.combo) do
+                best_combo[#best_combo + 1] = entry
+            end
+        end
+    end
+
+    local result = { score = best_score, combo = best_combo }
+    memo[key] = result
+    return result
+end
+
+local function solveGreedy(c, hand_lookup)
+    local combo = {}
+    local total_score = 0
+
+    while true do
+        local extractions = generateExtractions(c, hand_lookup)
+        if #extractions == 0 then break end
+
+        local best = nil
+        local best_score = 0
+        for _, ext in ipairs(extractions) do
+            if ext.score > best_score then
+                best_score = ext.score
+                best = ext
+            end
+        end
+
+        if not best or best_score <= 0 then break end
+
+        combo[#combo + 1] = best
+        total_score = total_score + best.score
+        for _, v in ipairs(best.matched) do
+            c[v] = (c[v] or 0) - 1
+            if c[v] <= 0 then c[v] = nil end
+        end
+    end
+
+    return { score = total_score, combo = combo }
+end
+
+local EXACT_SOLVER_LIMIT = 12
+
 function Scoring.findOptimalCombination(values, hands_list)
     local counts = Scoring.getCounts(values)
+    for i = 1, 6 do counts[i] = counts[i] or 0 end
 
     local hand_lookup = {}
     for _, hand in ipairs(hands_list) do
         hand_lookup[hand.name] = hand
     end
 
-    local memo = {}
-
-    local function solve(c)
-        local key = countsKey(c)
-        if memo[key] then return memo[key] end
-
-        local extractions = generateExtractions(c, hand_lookup)
-
-        local best_score = 0
-        local best_combo = {}
-
-        for _, ext in ipairs(extractions) do
-            local remaining = subtractMatched(c, ext.matched)
-            local sub = solve(remaining)
-            local total = ext.score + sub.score
-
-            if total > best_score then
-                best_score = total
-                best_combo = { { hand = ext.hand, matched = ext.matched, score = ext.score } }
-                for _, entry in ipairs(sub.combo) do
-                    best_combo[#best_combo + 1] = entry
-                end
-            end
-        end
-
-        local result = { score = best_score, combo = best_combo }
-        memo[key] = result
-        return result
+    local result
+    if #values <= EXACT_SOLVER_LIMIT then
+        local memo = {}
+        result = solveExact(counts, memo, hand_lookup)
+    else
+        result = solveGreedy(counts, hand_lookup)
     end
-
-    local result = solve(counts)
 
     if #result.combo == 0 then
         local high_hand = hand_lookup["High Roll"]

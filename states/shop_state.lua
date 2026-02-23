@@ -33,8 +33,6 @@ local section_anims = {}
 local currency_anim = { display = 0 }
 local card_hovers = {}
 
-local BASE_EXTRA_DIE_COST = 15
-
 local shop_col = 1
 local shop_row = 1
 local shop_mode = "grid"
@@ -55,8 +53,7 @@ local function getColItemCount(col)
 end
 
 local function getExtraDieCost(player)
-    local extra = math.max(0, #player.dice_pool - 5)
-    return BASE_EXTRA_DIE_COST + extra * extra * 10
+    return math.floor((#player.dice_pool - 5 + 1) ^ 16)
 end
 
 local die_colors_map = {
