@@ -5,21 +5,33 @@ local function createBosses()
     return {
         Boss:new({
             name = "The Lockdown",
-            description = "Locks a random die for the entire round",
+            description = "Locks 30% of your dice to random values",
             icon = "X",
             modifier = function(self, context)
                 if context and context.player and #context.player.dice_pool > 0 then
-                    local idx = RNG.random(1, #context.player.dice_pool)
-                    local die = context.player.dice_pool[idx]
-                    die.locked = true
-                    die.value = RNG.random(1, 6)
-                    context.boss_locked_die = die
+                    local pool = context.player.dice_pool
+                    local lock_count = math.max(1, math.ceil(#pool * 0.3))
+                    local indices = {}
+                    for i = 1, #pool do table.insert(indices, i) end
+                    context.boss_locked_dice = {}
+                    for _ = 1, lock_count do
+                        if #indices == 0 then break end
+                        local pick = RNG.random(1, #indices)
+                        local idx = indices[pick]
+                        table.remove(indices, pick)
+                        local die = pool[idx]
+                        die.locked = true
+                        die.value = RNG.random(1, 6)
+                        table.insert(context.boss_locked_dice, die)
+                    end
                 end
             end,
             revert = function(self, context)
-                if context and context.boss_locked_die then
-                    context.boss_locked_die.locked = false
-                    context.boss_locked_die = nil
+                if context and context.boss_locked_dice then
+                    for _, die in ipairs(context.boss_locked_dice) do
+                        die.locked = false
+                    end
+                    context.boss_locked_dice = nil
                 end
             end,
         }),

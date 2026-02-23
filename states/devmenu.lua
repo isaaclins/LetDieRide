@@ -25,6 +25,9 @@ local all_dice_ref = nil
 local all_bosses_ref = nil
 
 local _btn_regions = {}
+local active_input = nil
+local input_buffer = ""
+local input_cursor_blink = 0
 
 local function initAnims()
     panel_anim = { scale = 0.85, alpha = 0 }
@@ -61,6 +64,8 @@ function DevMenu:open()
     draft = createDraft()
     selected_boss = nil
     _btn_regions = {}
+    active_input = nil
+    input_buffer = ""
 end
 
 function DevMenu:getDraft()
@@ -109,15 +114,57 @@ local function drawPlayerTab(px, py, pw, ph)
         { label = "Max Dice", key = "max_dice", steps = { -1, 1 } },
     }
 
+    local val_box_w, val_box_h = 80, 28
+
     for _, row in ipairs(rows) do
         love.graphics.setFont(label_font)
         UI.setColor(UI.colors.text_dim)
         love.graphics.print(row.label, px + pad, ly + 5)
 
-        love.graphics.setFont(val_font)
-        UI.setColor(UI.colors.accent)
-        local val = draft[row.key] or 0
-        love.graphics.printf(tostring(val), px + 160, ly + 3, 80, "center")
+        local vx = px + 160
+        local vy = ly + 2
+        local is_editing = active_input == row.key
+
+        if is_editing then
+            love.graphics.setColor(0.15, 0.15, 0.25, 1)
+            UI.roundRect("fill", vx, vy, val_box_w, val_box_h, 4)
+            love.graphics.setColor(UI.colors.orange[1], UI.colors.orange[2], UI.colors.orange[3], 0.8)
+            love.graphics.setLineWidth(2)
+            UI.roundRect("line", vx, vy, val_box_w, val_box_h, 4)
+            love.graphics.setLineWidth(1)
+
+            love.graphics.setFont(val_font)
+            UI.setColor(UI.colors.text)
+            love.graphics.printf(input_buffer, vx + 4, vy + (val_box_h - val_font:getHeight()) / 2, val_box_w - 8, "center")
+
+            input_cursor_blink = input_cursor_blink + love.timer.getDelta()
+            if math.floor(input_cursor_blink * 2) % 2 == 0 then
+                local text_w = val_font:getWidth(input_buffer)
+                local cx = vx + (val_box_w + text_w) / 2 + 2
+                UI.setColor(UI.colors.text)
+                love.graphics.setLineWidth(2)
+                love.graphics.line(cx, vy + 5, cx, vy + val_box_h - 5)
+                love.graphics.setLineWidth(1)
+            end
+        else
+            local mx, my = love.mouse.getPosition()
+            local hovered = UI.pointInRect(mx, my, vx, vy, val_box_w, val_box_h)
+
+            if hovered then
+                love.graphics.setColor(0.12, 0.12, 0.22, 1)
+                UI.roundRect("fill", vx, vy, val_box_w, val_box_h, 4)
+                love.graphics.setColor(UI.colors.accent[1], UI.colors.accent[2], UI.colors.accent[3], 0.4)
+                love.graphics.setLineWidth(1)
+                UI.roundRect("line", vx, vy, val_box_w, val_box_h, 4)
+            end
+
+            love.graphics.setFont(val_font)
+            UI.setColor(UI.colors.accent)
+            local val = draft[row.key] or 0
+            love.graphics.printf(tostring(val), vx, vy + (val_box_h - val_font:getHeight()) / 2, val_box_w, "center")
+        end
+
+        registerBtn("player_val_" .. row.key, vx, vy, val_box_w, val_box_h)
 
         local bx = px + 260
         for _, step in ipairs(row.steps) do
@@ -293,8 +340,10 @@ local function drawHandsTab(px, py, pw, ph)
     local pad = 16
     local row_h = 30
     local name_font = Fonts.get(13)
+    local val_font = Fonts.get(13)
     local btn_w, btn_h = 28, 24
     local col_w = math.floor((pw - pad * 2) / 2)
+    local lvl_box_w, lvl_box_h = 56, 22
 
     for idx, hand in ipairs(draft.hands) do
         local col = (idx - 1) % 2
@@ -306,9 +355,51 @@ local function drawHandsTab(px, py, pw, ph)
         UI.setColor(UI.colors.text)
         love.graphics.print(hand.name, hx, hy + 3)
 
-        UI.setColor(UI.colors.accent_dim)
-        local lvl_text = "Lv" .. hand.upgrade_level .. "/" .. hand.max_upgrade
-        love.graphics.print(lvl_text, hx + 130, hy + 3)
+        local lvl_x = hx + 130
+        local lvl_y = hy + 2
+        local input_key = "hand_lvl_" .. idx
+        local is_editing = active_input == input_key
+
+        if is_editing then
+            love.graphics.setColor(0.15, 0.15, 0.25, 1)
+            UI.roundRect("fill", lvl_x, lvl_y, lvl_box_w, lvl_box_h, 3)
+            love.graphics.setColor(UI.colors.orange[1], UI.colors.orange[2], UI.colors.orange[3], 0.8)
+            love.graphics.setLineWidth(2)
+            UI.roundRect("line", lvl_x, lvl_y, lvl_box_w, lvl_box_h, 3)
+            love.graphics.setLineWidth(1)
+
+            love.graphics.setFont(val_font)
+            UI.setColor(UI.colors.text)
+            love.graphics.printf(input_buffer, lvl_x + 2, lvl_y + (lvl_box_h - val_font:getHeight()) / 2, lvl_box_w - 4, "center")
+
+            input_cursor_blink = input_cursor_blink + love.timer.getDelta()
+            if math.floor(input_cursor_blink * 2) % 2 == 0 then
+                local text_w = val_font:getWidth(input_buffer)
+                local cx = lvl_x + (lvl_box_w + text_w) / 2 + 1
+                UI.setColor(UI.colors.text)
+                love.graphics.setLineWidth(2)
+                love.graphics.line(cx, lvl_y + 3, cx, lvl_y + lvl_box_h - 3)
+                love.graphics.setLineWidth(1)
+            end
+        else
+            local mx, my = love.mouse.getPosition()
+            local hovered = UI.pointInRect(mx, my, lvl_x, lvl_y, lvl_box_w, lvl_box_h)
+
+            if hovered then
+                love.graphics.setColor(0.12, 0.12, 0.22, 1)
+                UI.roundRect("fill", lvl_x, lvl_y, lvl_box_w, lvl_box_h, 3)
+                love.graphics.setColor(UI.colors.accent[1], UI.colors.accent[2], UI.colors.accent[3], 0.4)
+                love.graphics.setLineWidth(1)
+                UI.roundRect("line", lvl_x, lvl_y, lvl_box_w, lvl_box_h, 3)
+            end
+
+            love.graphics.setFont(val_font)
+            UI.setColor(UI.colors.accent_dim)
+            local lvl_text = "Lv" .. hand.upgrade_level .. "/" .. hand.max_upgrade
+            love.graphics.printf(lvl_text, lvl_x, lvl_y + (lvl_box_h - val_font:getHeight()) / 2, lvl_box_w, "center")
+        end
+
+        registerBtn(input_key, lvl_x, lvl_y, lvl_box_w, lvl_box_h)
 
         smallBtn("-", hx + col_w - btn_w * 2 - 12, hy + 1, btn_w, btn_h, UI.colors.red, { 0.95, 0.30, 0.30, 1 })
         registerBtn("hand_down_" .. idx, hx + col_w - btn_w * 2 - 12, hy + 1, btn_w, btn_h)
@@ -444,6 +535,20 @@ function DevMenu:handleButton(id)
         end
     end
 
+    if id:find("^player_val_") then
+        local key = id:sub(12)
+        if draft[key] ~= nil then
+            active_input = key
+            input_buffer = tostring(draft[key])
+            input_cursor_blink = 0
+        end
+        return nil
+    end
+
+    if active_input then
+        active_input = nil
+    end
+
     if id:find("^player_") then
         local rest = id:sub(8)
         local key, step_str = rest:match("^(.+)_([%-]?%d+)$")
@@ -525,14 +630,27 @@ function DevMenu:handleButton(id)
         return nil
     end
 
+    if id:find("^hand_lvl_") then
+        local idx = tonumber(id:sub(10))
+        if idx and draft.hands[idx] then
+            active_input = id
+            input_buffer = tostring(draft.hands[idx].upgrade_level)
+            input_cursor_blink = 0
+        end
+        return nil
+    end
+
     if id:find("^hand_up_") then
         local idx = tonumber(id:sub(9))
         if idx and draft.hands[idx] then
             local hand = draft.hands[idx]
-            if hand.upgrade_level < hand.max_upgrade then
-                hand:setUpgradeLevel(hand.upgrade_level + 1)
-                Toast.show(hand.name .. " -> Lv" .. hand.upgrade_level, "success")
+            local new_lvl = hand.upgrade_level + 1
+            if new_lvl > hand.max_upgrade then
+                hand.max_upgrade = new_lvl
+                Toast.show("Requires Limit Breaker in-game", "info")
             end
+            hand:setUpgradeLevel(new_lvl)
+            Toast.show(hand.name .. " -> Lv" .. hand.upgrade_level, "success")
         end
         return nil
     end
@@ -552,7 +670,46 @@ function DevMenu:handleButton(id)
     return nil
 end
 
+function DevMenu:textinput(text)
+    if not active_input then return end
+    if text:match("^[0-9]$") then
+        input_buffer = input_buffer .. text
+        input_cursor_blink = 0
+    end
+end
+
 function DevMenu:keypressed(key)
+    if active_input then
+        if key == "backspace" then
+            input_buffer = input_buffer:sub(1, -2)
+            input_cursor_blink = 0
+        elseif key == "return" or key == "tab" then
+            local val = tonumber(input_buffer)
+            if val then
+                local hand_idx = active_input:match("^hand_lvl_(%d+)$")
+                if hand_idx then
+                    hand_idx = tonumber(hand_idx)
+                    if hand_idx and draft.hands[hand_idx] then
+                        local hand = draft.hands[hand_idx]
+                        val = math.max(0, val)
+                        if val > hand.max_upgrade then
+                            hand.max_upgrade = val
+                            Toast.show("Requires Limit Breaker in-game", "info")
+                        end
+                        hand:setUpgradeLevel(val)
+                        Toast.show(hand.name .. " -> Lv" .. hand.upgrade_level, "success")
+                    end
+                elseif draft[active_input] ~= nil then
+                    draft[active_input] = math.max(0, val)
+                    Toast.show(active_input .. " = " .. draft[active_input], "info")
+                end
+            end
+            active_input = nil
+        elseif key == "escape" then
+            active_input = nil
+        end
+        return nil
+    end
     if key == "escape" then
         anim_init = false
         return "close"

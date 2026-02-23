@@ -13,6 +13,8 @@ function Player:init()
     self.score = 0
     self.max_dice = 5
     self.free_choice_used = false
+    self.limit_break_count = 0
+    self.interest_cap = 5
 end
 
 function Player:rollAllDice()
@@ -191,7 +193,7 @@ function Player:earnCurrency(score)
         total = total + self.rerolls_remaining
     end
 
-    local interest = math.min(5, math.floor(self.currency / 5))
+    local interest = math.min(self.interest_cap, math.floor(self.currency / 5))
     if interest > 0 then
         table.insert(breakdown, { label = "Interest (1 per $5)", amount = interest })
         total = total + interest
@@ -199,6 +201,18 @@ function Player:earnCurrency(score)
 
     self.currency = self.currency + total
     return total, breakdown
+end
+
+function Player:applyLimitBreak()
+    self.limit_break_count = self.limit_break_count + 1
+    for _, hand in ipairs(self.hands) do
+        hand.max_upgrade = hand.max_upgrade + 5
+    end
+    for _, die in ipairs(self.dice_pool) do
+        die.max_upgrade = die.max_upgrade + 2
+    end
+    self.max_dice = self.max_dice + 2
+    self.interest_cap = self.interest_cap + 3
 end
 
 function Player:isBossRound()

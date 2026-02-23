@@ -37,7 +37,6 @@ local section_anims = {}
 local currency_anim = { display = 0 }
 local card_hovers = {}
 
-local MAX_DICE = 10
 local BASE_EXTRA_DIE_COST = 15
 
 local shop_col = 1
@@ -45,6 +44,10 @@ local shop_row = 1
 local shop_mode = "grid"
 local replace_focus = 1
 local shop_visible_hands = {}
+
+local BULK_OPTIONS = { 1, 10, 100, -1 }
+local BULK_LABELS = { [1] = "x1", [10] = "x10", [100] = "x100", [-1] = "MAX" }
+local bulk_index = 1
 
 local function getColItemCount(col)
     if not shop then return 0 end
@@ -77,6 +80,7 @@ function ShopState:init(player, all_dice_types, all_items)
     shop_row = 1
     shop_mode = "grid"
     replace_focus = 1
+    bulk_index = 1
 
     local sort_mode = Settings.get("dice_sort_mode") or "default"
     player:sortDice(sort_mode)
@@ -126,10 +130,11 @@ function ShopState:draw(player)
     if not replacing_die then
         love.graphics.setFont(Fonts.get(11))
         UI.setColor(UI.colors.text_dark)
-        love.graphics.printf(
-            "Arrows: Navigate  |  Enter: Select  |  Tab: Continue  |  Esc: Pause",
-            0, H - 13, W, "center"
-        )
+        local hints = "Arrows: Navigate  |  Enter: Select  |  Tab: Continue  |  Esc: Pause"
+        if player.limit_break_count >= 1 then
+            hints = hints .. "  |  B: Bulk (" .. BULK_LABELS[BULK_OPTIONS[bulk_index]] .. ")"
+        end
+        love.graphics.printf(hints, 0, H - 13, W, "center")
     end
 
     if replacing_die then
@@ -149,7 +154,7 @@ function ShopState:drawHeader(player, W)
     UI.setColor(UI.colors.green)
     local hdr_font = love.graphics.getFont()
     local hdr_cs = hdr_font:getHeight() / CoinAnim.getHeight()
-    CoinAnim.drawStaticWithAmount(tostring(math.floor(currency_anim.display + 0.5)), 0, 22, "right", W - 24, hdr_cs)
+    CoinAnim.drawStaticWithAmount(UI.abbreviate(math.floor(currency_anim.display + 0.5)), 0, 22, "right", W - 24, hdr_cs)
 
     if not shop.free_choice_used then
         UI.drawBadge("FREE CHOICE AVAILABLE", 24, 22, UI.colors.free_badge, Fonts.get(14), true)
@@ -158,31 +163,52 @@ end
 
 function ShopState:drawPlayerDice(player, W, H)
     local count = #player.dice_pool
-    local has_ghost = count < MAX_DICE
+    local has_ghost = count < player.max_dice
     local slot_count = has_ghost and (count + 1) or count
-    local max_total = W * 0.7
-    local die_size = math.min(60, math.floor((max_total - (slot_count - 1) * 8) / slot_count))
-    local gap = math.min(12, math.floor((max_total - slot_count * die_size) / math.max(slot_count - 1, 1)))
-    local total = slot_count * die_size + (slot_count - 1) * gap
-    local start_x = (W - total) / 2
-    local die_y = 80
+
+    local min_die = 28
+    local max_die = 60
+    local gap = 8
+    local label_h = 14
+    local max_grid_w = W * 0.85
+
+    local die_size = math.min(max_die, math.floor((max_grid_w - (slot_count - 1) * gap) / slot_count))
+    local rows = 1
+    if die_size < min_die then
+        die_size = math.min(max_die, 40)
+        local cols = math.floor((max_grid_w + gap) / (die_size + gap))
+        cols = math.max(1, cols)
+        rows = math.ceil(slot_count / cols)
+    end
+    local cols = math.ceil(slot_count / rows)
+    local row_h = die_size + label_h + gap
+    local grid_w = math.min(slot_count, cols) * die_size + (math.min(slot_count, cols) - 1) * gap
+    local start_x = (W - grid_w) / 2
+    local base_y = 80
 
     love.graphics.setFont(Fonts.get(12))
     UI.setColor(UI.colors.text_dim)
     love.graphics.printf("YOUR DICE", 0, 66, W, "center")
 
     for i, die in ipairs(player.dice_pool) do
-        local dx = start_x + (i - 1) * (die_size + gap)
+        local col = (i - 1) % cols
+        local row = math.floor((i - 1) / cols)
+        local dx = start_x + col * (die_size + gap)
+        local dy = base_y + row * row_h
         local dot_color = die_colors_map[die.color] or UI.colors.die_black
-        UI.drawDie(dx, die_y, die_size, die.value, dot_color, nil, false, false, die.glow_color)
-        love.graphics.setFont(Fonts.get(10))
+        UI.drawDie(dx, dy, die_size, die.value, dot_color, nil, false, false, die.glow_color)
+        love.graphics.setFont(Fonts.get(9))
         UI.setColor(UI.colors.text_dim)
-        love.graphics.printf(die.name, dx - 5, die_y + die_size + 3, die_size + 10, "center")
+        love.graphics.printf(die.name, dx - 5, dy + die_size + 2, die_size + 10, "center")
     end
 
+    self._dice_bar_height = base_y + rows * row_h
+
     if has_ghost then
-        local gx = start_x + count * (die_size + gap)
-        local gy = die_y
+        local ghost_col = count % cols
+        local ghost_row = math.floor(count / cols)
+        local gx = start_x + ghost_col * (die_size + gap)
+        local gy = base_y + ghost_row * row_h
         local r = die_size * 0.15
         local mx, my = love.mouse.getPosition()
         local ghost_hovered = UI.pointInRect(mx, my, gx, gy, die_size, die_size)
@@ -228,7 +254,7 @@ function ShopState:drawPlayerDice(player, W, H)
             UI.setColor(UI.colors.red)
         end
         local ghost_cs = Fonts.get(11):getHeight() / CoinAnim.getHeight()
-        CoinAnim.drawStaticWithAmount(tostring(cost), gx - 5, gy + die_size + 3, "center", die_size + 10, ghost_cs)
+        CoinAnim.drawStaticWithAmount(UI.abbreviate(cost), gx - 5, gy + die_size + 3, "center", die_size + 10, ghost_cs)
 
         self._ghost_die = { x = gx, y = gy, w = die_size, h = die_size, hovered = ghost_hovered, cost = cost }
 
@@ -243,9 +269,10 @@ end
 function ShopState:drawShopHandReference(player, W, H)
     local sa = section_anims[3] or { y_off = 0, alpha = 1 }
     local section_x = 2 * W / 3 + 10
-    local section_y = 160 + sa.y_off
+    local top = self._dice_bar_height or 160
+    local section_y = top + sa.y_off
     local section_w = W / 3 - 30
-    local section_h = H - 250
+    local section_h = H - top - 90
 
     shop_visible_hands = {}
     local upgrade_index_map = {}
@@ -267,6 +294,42 @@ function ShopState:drawShopHandReference(player, W, H)
     love.graphics.setColor(UI.colors.accent[1], UI.colors.accent[2], UI.colors.accent[3], sa.alpha)
     love.graphics.printf("HAND UPGRADES", section_x, section_y + 10, section_w, "center")
 
+    local bulk_active = player.limit_break_count >= 1
+    local cur_bulk = bulk_active and BULK_OPTIONS[bulk_index] or 1
+
+    self._bulk_buttons = {}
+    if bulk_active then
+        local btn_w = 36
+        local btn_h = 18
+        local btn_gap = 4
+        local total_btn_w = #BULK_OPTIONS * btn_w + (#BULK_OPTIONS - 1) * btn_gap
+        local btn_start_x = section_x + (section_w - total_btn_w) / 2
+        local btn_y = section_y + 30
+        local mx_b, my_b = love.mouse.getPosition()
+        for bi, bval in ipairs(BULK_OPTIONS) do
+            local bx = btn_start_x + (bi - 1) * (btn_w + btn_gap)
+            local selected = (bulk_index == bi)
+            local bhovered = UI.pointInRect(mx_b, my_b, bx, btn_y, btn_w, btn_h)
+            if selected then
+                love.graphics.setColor(UI.colors.accent[1], UI.colors.accent[2], UI.colors.accent[3], sa.alpha)
+            elseif bhovered then
+                love.graphics.setColor(UI.colors.panel_hover[1], UI.colors.panel_hover[2], UI.colors.panel_hover[3], sa.alpha)
+            else
+                love.graphics.setColor(UI.colors.panel_light[1], UI.colors.panel_light[2], UI.colors.panel_light[3], sa.alpha * 0.6)
+            end
+            UI.roundRect("fill", bx, btn_y, btn_w, btn_h, 4)
+            love.graphics.setFont(Fonts.get(11))
+            if selected then
+                love.graphics.setColor(0, 0, 0, sa.alpha)
+            else
+                love.graphics.setColor(UI.colors.text[1], UI.colors.text[2], UI.colors.text[3], sa.alpha * 0.8)
+            end
+            love.graphics.printf(BULK_LABELS[bval], bx, btn_y + 3, btn_w, "center")
+            self._bulk_buttons[bi] = { x = bx, y = btn_y, w = btn_w, h = btn_h, hovered = bhovered }
+        end
+        header_h = header_h + 22
+    end
+
     self._hand_ref_buttons = {}
     local mx, my = love.mouse.getPosition()
 
@@ -279,7 +342,25 @@ function ShopState:drawShopHandReference(player, W, H)
         local maxed = hand.upgrade_level >= hand.max_upgrade
         local upgrade_idx = upgrade_index_map[hand]
         local can_upgrade = upgrade_idx and not maxed
-        local can_afford = can_upgrade and (not shop.free_choice_used or player.currency >= hand:getUpgradeCost())
+
+        local display_cost, bulk_count_actual
+        if can_upgrade and shop.free_choice_used then
+            if cur_bulk == -1 then
+                bulk_count_actual, display_cost = shop:getBulkMaxCount(hand, player.currency)
+                if bulk_count_actual == 0 then display_cost = hand:getUpgradeCost() end
+            elseif cur_bulk > 1 then
+                display_cost, bulk_count_actual = shop:getBulkUpgradeCost(hand, cur_bulk)
+                if bulk_count_actual == 0 then display_cost = hand:getUpgradeCost() end
+            else
+                display_cost = hand:getUpgradeCost()
+                bulk_count_actual = 1
+            end
+        else
+            display_cost = hand:getUpgradeCost()
+            bulk_count_actual = 1
+        end
+
+        local can_afford = can_upgrade and (not shop.free_choice_used or player.currency >= display_cost)
         local hovered = UI.pointInRect(mx, my, card_x, card_y, card_w, card_h)
         local is_focused = shop_mode == "grid" and shop_col == 3 and shop_row == i and not replacing_die
 
@@ -338,15 +419,13 @@ function ShopState:drawShopHandReference(player, W, H)
                 love.graphics.setColor(UI.colors.free_badge[1], UI.colors.free_badge[2], UI.colors.free_badge[3], sa.alpha)
                 love.graphics.printf("FREE", card_x, text_top, card_w - 8, "right")
             else
-                local live_cost = hand:getUpgradeCost()
-                local cost_affordable = player.currency >= live_cost
-                if cost_affordable then
+                if can_afford then
                     love.graphics.setColor(UI.colors.green[1], UI.colors.green[2], UI.colors.green[3], sa.alpha)
                 else
                     love.graphics.setColor(UI.colors.red[1], UI.colors.red[2], UI.colors.red[3], sa.alpha)
                 end
                 local huc = Fonts.get(14):getHeight() / CoinAnim.getHeight()
-                CoinAnim.drawStaticWithAmount(tostring(live_cost), card_x, text_top, "right", card_w - 8, huc)
+                CoinAnim.drawStaticWithAmount(UI.abbreviate(display_cost), card_x, text_top, "right", card_w - 8, huc)
             end
         elseif maxed then
             love.graphics.setFont(Fonts.get(12))
@@ -401,9 +480,10 @@ end
 function ShopState:drawDiceSection(player, W, H)
     local sa = section_anims[1] or { y_off = 0, alpha = 1 }
     local section_x = 20
-    local section_y = 160 + sa.y_off
+    local top = self._dice_bar_height or 160
+    local section_y = top + sa.y_off
     local section_w = W / 3 - 30
-    local section_h = H - 250
+    local section_h = H - top - 90
 
     love.graphics.setColor(1, 1, 1, sa.alpha)
     UI.drawPanel(section_x, section_y, section_w, section_h, { border = UI.colors.panel_light })
@@ -465,7 +545,7 @@ function ShopState:drawDiceSection(player, W, H)
             UI.setColor(can_afford and UI.colors.accent or UI.colors.red)
             love.graphics.setFont(Fonts.get(14))
             local dcs = Fonts.get(14):getHeight() / CoinAnim.getHeight()
-            CoinAnim.drawStaticWithAmount(tostring(entry.cost), item_x, iy + 8 + ch.lift, "right", item_w - 8, dcs)
+            CoinAnim.drawStaticWithAmount(UI.abbreviate(entry.cost), item_x, iy + 8 + ch.lift, "right", item_w - 8, dcs)
         end
 
         self._dice_buttons[i] = { x = item_x, y = iy, w = item_w, h = 72, hovered = hovered }
@@ -485,9 +565,10 @@ end
 function ShopState:drawItemsSection(player, W, H)
     local sa = section_anims[2] or { y_off = 0, alpha = 1 }
     local section_x = W / 3 + 5
-    local section_y = 160 + sa.y_off
+    local top = self._dice_bar_height or 160
+    local section_y = top + sa.y_off
     local section_w = W / 3 - 30
-    local section_h = H - 250
+    local section_h = H - top - 90
 
     love.graphics.setColor(1, 1, 1, sa.alpha)
     UI.drawPanel(section_x, section_y, section_w, section_h, { border = UI.colors.panel_light })
@@ -537,7 +618,7 @@ function ShopState:drawItemsSection(player, W, H)
         UI.setColor(can_afford and UI.colors.accent or UI.colors.red)
         love.graphics.setFont(Fonts.get(14))
         local ics = Fonts.get(14):getHeight() / CoinAnim.getHeight()
-        CoinAnim.drawStaticWithAmount(tostring(item.cost), item_x, iy + 8 + ch.lift, "right", item_w - 8, ics)
+        CoinAnim.drawStaticWithAmount(UI.abbreviate(item.cost), item_x, iy + 8 + ch.lift, "right", item_w - 8, ics)
 
         self._item_buttons[i] = { x = item_x, y = iy, w = item_w, h = 60, hovered = hovered }
 
@@ -579,13 +660,20 @@ function ShopState:drawDieReplaceOverlay(player, W, H)
     love.graphics.rectangle("fill", 0, 0, W, H)
 
     local count = #player.dice_pool
-    local die_size = math.min(65, math.floor((W * 0.55 - (count - 1) * 10) / count))
-    local gap = math.min(16, math.floor(die_size * 0.2))
-    local total = count * die_size + (count - 1) * gap
-    local panel_w = math.max(500, total + 60)
-    local panel_h = die_size + 120
+    local max_panel_w = W * 0.85
+    local die_size = 50
+    local gap = 8
+    local label_h = 14
+    local cols = math.floor((max_panel_w - 60) / (die_size + gap))
+    cols = math.min(cols, count)
+    local rows = math.ceil(count / cols)
+    local row_h = die_size + label_h + gap
+
+    local grid_w = cols * die_size + (cols - 1) * gap
+    local panel_w = math.max(400, grid_w + 60)
+    local panel_h = 50 + rows * row_h + 50
     local px = (W - panel_w) / 2
-    local py = (H - panel_h) / 2
+    local py = math.max(20, (H - panel_h) / 2)
 
     UI.drawPanel(px, py, panel_w, panel_h, { border = UI.colors.accent })
 
@@ -593,34 +681,38 @@ function ShopState:drawDieReplaceOverlay(player, W, H)
     UI.setColor(UI.colors.text)
     love.graphics.printf("Replace which die?", px, py + 15, panel_w, "center")
 
-    local start_x = px + (panel_w - total) / 2
-    local die_y = py + 50
+    local grid_x = px + (panel_w - grid_w) / 2
+    local grid_y = py + 50
 
     local mx, my = love.mouse.getPosition()
     self._replace_die_buttons = {}
 
     for i, die in ipairs(player.dice_pool) do
-        local dx = start_x + (i - 1) * (die_size + gap)
-        local hovered = UI.pointInRect(mx, my, dx, die_y, die_size, die_size)
+        local col = (i - 1) % cols
+        local row = math.floor((i - 1) / cols)
+        local dx = grid_x + col * (die_size + gap)
+        local dy = grid_y + row * row_h
+        local hovered = UI.pointInRect(mx, my, dx, dy, die_size, die_size)
         local dot_color = die_colors_map[die.color] or UI.colors.die_black
-        UI.drawDie(dx, die_y, die_size, die.value, dot_color, nil, false, hovered, die.glow_color)
-        self._replace_die_buttons[i] = { x = dx, y = die_y, w = die_size, h = die_size }
+        UI.drawDie(dx, dy, die_size, die.value, dot_color, nil, false, hovered, die.glow_color)
+        self._replace_die_buttons[i] = { x = dx, y = dy, w = die_size, h = die_size }
 
         if replace_focus == i then
-            UI.drawFocusRect(dx, die_y, die_size, die_size)
+            UI.drawFocusRect(dx, dy, die_size, die_size)
         end
 
-        love.graphics.setFont(Fonts.get(10))
+        love.graphics.setFont(Fonts.get(9))
         UI.setColor(UI.colors.text_dim)
-        love.graphics.printf(die.name, dx - 5, die_y + die_size + 3, die_size + 10, "center")
+        love.graphics.printf(die.name, dx - 5, dy + die_size + 2, die_size + 10, "center")
     end
 
+    local btn_y = py + panel_h - 40
     self._cancel_replace_hovered = UI.drawButton(
-        "CANCEL", px + panel_w / 2 - 60, py + panel_h - 40, 120, 32,
+        "CANCEL", px + panel_w / 2 - 60, btn_y, 120, 32,
         { font = Fonts.get(16), color = UI.colors.red }
     )
     if replace_focus == 0 then
-        UI.drawFocusRect(px + panel_w / 2 - 60, py + panel_h - 40, 120, 32)
+        UI.drawFocusRect(px + panel_w / 2 - 60, btn_y, 120, 32)
     end
 end
 
@@ -652,8 +744,8 @@ function ShopState:mousepressed(x, y, button, player)
 
     if self._ghost_die and self._ghost_die.hovered then
         local cost = self._ghost_die.cost
-        if #player.dice_pool >= MAX_DICE then
-            Toast.error("Dice pool is full! (max " .. MAX_DICE .. ")")
+        if #player.dice_pool >= player.max_dice then
+            Toast.error("Dice pool is full! (max " .. player.max_dice .. ")")
         elseif player.currency < cost then
             Toast.error("Not enough currency! ($" .. cost .. " needed)")
         else
@@ -665,6 +757,7 @@ function ShopState:mousepressed(x, y, button, player)
                 die_type = "vanilla",
                 ability_name = "None",
                 ability_desc = "A standard die.",
+                max_upgrade = 3 + 2 * player.limit_break_count,
             })
             local max_order = 0
             for _, d in ipairs(player.dice_pool) do
@@ -701,9 +794,18 @@ function ShopState:mousepressed(x, y, button, player)
         end
     end
 
+    for bi, btn in pairs(self._bulk_buttons or {}) do
+        if btn.hovered then
+            bulk_index = bi
+            return nil
+        end
+    end
+
+    local cur_bulk = (player.limit_break_count >= 1) and BULK_OPTIONS[bulk_index] or 1
+
     for i, btn in pairs(self._hand_ref_buttons or {}) do
         if btn.hovered and btn.upgrade_idx then
-            local ok, msg = shop:buyHandUpgrade(player, btn.upgrade_idx)
+            local ok, msg = shop:buyHandUpgrade(player, btn.upgrade_idx, cur_bulk)
             if ok then
                 Toast.success(msg)
                 Particles.sparkle(x, y, UI.colors.accent, 12)
@@ -724,6 +826,11 @@ end
 function ShopState:keypressed(key, player)
     if replacing_die then
         local count = player and #player.dice_pool or 0
+        local max_pw = love.graphics.getWidth() * 0.85
+        local r_cols = math.floor((max_pw - 60) / (50 + 8))
+        r_cols = math.min(r_cols, count)
+        if r_cols < 1 then r_cols = 1 end
+
         if key == "left" then
             if replace_focus > 0 then
                 replace_focus = replace_focus - 1
@@ -739,9 +846,21 @@ function ShopState:keypressed(key, player)
                 replace_focus = 1
             end
         elseif key == "down" then
-            replace_focus = 0
+            if replace_focus == 0 then
+                replace_focus = 1
+            elseif replace_focus + r_cols <= count then
+                replace_focus = replace_focus + r_cols
+            else
+                replace_focus = 0
+            end
         elseif key == "up" then
-            if replace_focus == 0 then replace_focus = 1 end
+            if replace_focus == 0 then
+                replace_focus = count
+            elseif replace_focus - r_cols >= 1 then
+                replace_focus = replace_focus - r_cols
+            else
+                replace_focus = 0
+            end
         elseif key == "return" or key == "space" then
             if replace_focus == 0 then
                 replacing_die = false
@@ -798,16 +917,21 @@ function ShopState:keypressed(key, player)
                 local ok, msg = shop:buyItem(player, shop_row)
                 if ok then Toast.success(msg) else Toast.error(msg) end
             elseif shop_col == 3 and shop_row >= 1 and shop_row <= #shop_visible_hands then
+                local kb_bulk = (player.limit_break_count >= 1) and BULK_OPTIONS[bulk_index] or 1
                 local hand = shop_visible_hands[shop_row]
                 if hand then
                     for idx, upgrade in ipairs(shop.hand_upgrades) do
                         if upgrade.hand == hand then
-                            local ok, msg = shop:buyHandUpgrade(player, idx)
+                            local ok, msg = shop:buyHandUpgrade(player, idx, kb_bulk)
                             if ok then Toast.success(msg) else Toast.error(msg) end
                             break
                         end
                     end
                 end
+            end
+        elseif key == "b" then
+            if player.limit_break_count >= 1 then
+                bulk_index = bulk_index % #BULK_OPTIONS + 1
             end
         elseif key == "tab" then
             shop_mode = "continue"
@@ -818,7 +942,7 @@ function ShopState:keypressed(key, player)
             local col_count = getColItemCount(shop_col)
             if col_count > 0 then shop_row = 1 else shop_mode = "continue" end
         elseif key == "return" or key == "space" then
-            if player and #player.dice_pool < MAX_DICE then
+            if player and #player.dice_pool < player.max_dice then
                 local cost = getExtraDieCost(player)
                 if player.currency >= cost then
                     player.currency = player.currency - cost
@@ -827,6 +951,7 @@ function ShopState:keypressed(key, player)
                         name = "Vanilla Die", color = "black",
                         die_type = "vanilla", ability_name = "None",
                         ability_desc = "A standard die.",
+                        max_upgrade = 3 + 2 * player.limit_break_count,
                     })
                     local max_order = 0
                     for _, d in ipairs(player.dice_pool) do
@@ -841,7 +966,7 @@ function ShopState:keypressed(key, player)
                     Toast.error("Not enough currency! ($" .. cost .. " needed)")
                 end
             elseif player then
-                Toast.error("Dice pool is full! (max " .. MAX_DICE .. ")")
+                Toast.error("Dice pool is full! (max " .. player.max_dice .. ")")
             end
         elseif key == "tab" then
             shop_mode = "continue"

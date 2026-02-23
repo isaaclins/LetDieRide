@@ -182,15 +182,15 @@ The `context` table carries state between apply and revert (e.g., which die was 
 | Property | Value |
 |----------|-------|
 | Icon | X |
-| Modifier | Locks a random die to a random value |
+| Modifier | Locks 30% of dice (min 1) to random values |
 
-**Apply:** Picks a random die from the pool, sets it to a random value (1-6), and marks it as `boss_locked = true`. The player cannot unlock this die for the entire round.
+**Apply:** Randomly selects 30% of the dice pool (minimum 1, rounded up) and locks each to a random value (1-6). The player cannot unlock these dice for the entire round.
 
-**Revert:** Unlocks the die (`boss_locked = false`).
+**Revert:** Unlocks all boss-locked dice.
 
 **Visual:** Boss-locked dice show a bobbing purple "?" above them instead of the normal red lock badge.
 
-**Counter-play:** Wild Dice are immune (their value is player-controlled). Having more dice dilutes the impact since only one is affected.
+**Counter-play:** Wild Dice are immune (their value is player-controlled). Scales with pool size — at 10 dice, 3 are locked; at 5 dice, 2 are locked.
 
 ---
 

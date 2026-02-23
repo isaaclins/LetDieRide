@@ -132,7 +132,7 @@ function GameOver:draw(player)
         love.graphics.setColor(1, 1, 1, sa2.alpha)
         local fc_font = love.graphics.getFont()
         local fc_label = "Final Currency: "
-        local fc_amount = tostring(display_currency)
+        local fc_amount = UI.abbreviate(display_currency)
         local fc_cs = fc_font:getHeight() / CoinAnim.getHeight()
         local fc_coin_w = CoinAnim.getWidth(fc_cs)
         local fc_gap = math.max(1, math.floor(2 * fc_cs))

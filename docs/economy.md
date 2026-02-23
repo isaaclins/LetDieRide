@@ -262,4 +262,66 @@ The player's power grows through:
 3. **Dice abilities** — flat bonuses that become relatively weaker over time
 4. **Items** — multiplier items (Even Steven, Odd Todd) scale better than flat bonuses
 
-Eventually the exponential target outpaces the player's power growth, creating a natural difficulty ceiling. Skilled play and good RNG extend the run, but all runs eventually end.
+Eventually the exponential target outpaces the player's power growth, creating a natural difficulty ceiling. Skilled play and good RNG extend the run, but all runs eventually end — unless the player invests in the Limit Breaker.
+
+---
+
+## Limit Breaker (Infinite Mode)
+
+The **Limit Breaker** is a consumable item that raises all upgrade caps, enabling infinite scaling runs.
+
+### Availability
+
+Appears in the shop when **either** condition is met:
+- Player has reached round 10
+- Any hand upgrade is at max level
+
+### Cost
+
+Scales exponentially with each purchase:
+
+```lua
+cost = 500 × 2^(limit_break_count)
+```
+
+| Purchase | Cost | Cumulative |
+|----------|------|------------|
+| 1st | $500 | $500 |
+| 2nd | $1,000 | $1,500 |
+| 3rd | $2,000 | $3,500 |
+| 4th | $4,000 | $7,500 |
+| 5th | $8,000 | $15,500 |
+| 6th | $16,000 | $31,500 |
+
+### Effect (per purchase)
+
+| Cap | Increase | Starting | After 1 | After 2 |
+|-----|----------|----------|---------|---------|
+| Hand max upgrade | +5 | 5 | 10 | 15 |
+| Die max upgrade | +2 | 3 | 5 | 7 |
+| Dice pool max | +2 | 5 | 7 | 9 |
+| Interest cap | +3 | 5 | 8 | 11 |
+
+### Post-Cap Hand Upgrade Costs
+
+Hand upgrades past the original level 5 cap use a steeper cost formula:
+
+```lua
+-- Levels 0-4: cost = 5 + level² × 5
+-- Levels 5+:  cost = 5 + level² × 8
+```
+
+| Upgrade | Cost (post-cap) |
+|---------|----------------|
+| 5 → 6 | $205 |
+| 10 → 11 | $805 |
+| 15 → 16 | $1,805 |
+| 20 → 21 | $3,205 |
+
+### Strategy
+
+The Limit Breaker creates sustained tension between:
+1. **Buying more Limit Breakers** to unlock higher caps (exponentially expensive)
+2. **Investing in upgrades** within the current caps (quadratically expensive)
+
+Each hand upgrade gives ~+31% score. The target grows 35% per round. Players need roughly one key upgrade per round to stay alive, making the infinite run a tight resource management challenge.

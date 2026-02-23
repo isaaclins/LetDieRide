@@ -412,6 +412,10 @@ function love.keypressed(key)
 end
 
 function love.textinput(text)
+    if devmenu_open and state == "splash" then
+        DevMenu:textinput(text)
+        return
+    end
     if state == "seed_input" then
         SeedInput:textinput(text)
     end

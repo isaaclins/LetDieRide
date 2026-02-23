@@ -34,11 +34,17 @@ function Hand:upgrade()
 end
 
 function Hand:getUpgradeCost()
-    return 5 + self.upgrade_level * self.upgrade_level * 5
+    local level = self.upgrade_level
+    if level >= 5 then
+        return 5 + level * level * 8
+    end
+    return 5 + level * level * 5
 end
 
 function Hand:getDisplayScore()
-    return self.base_score .. " × " .. string.format("%.1f", self.multiplier)
+    local UI = require("functions/ui")
+    local mult_str = self.multiplier >= 1e3 and UI.abbreviate(self.multiplier) or string.format("%.1f", self.multiplier)
+    return UI.abbreviate(self.base_score) .. " x " .. mult_str
 end
 
 function Hand:setUpgradeLevel(level)

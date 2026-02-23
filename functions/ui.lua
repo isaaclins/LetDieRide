@@ -56,6 +56,23 @@ function UI.lerpColor(a, b, t)
     }
 end
 
+function UI.abbreviate(n)
+    if n ~= n then return "nan" end
+    if n == math.huge then return "inf" end
+    if n == -math.huge then return "-inf" end
+    local abs = math.abs(n)
+    local sign = n < 0 and "-" or ""
+    if abs >= 1e11 then
+        local e = math.floor(math.log10(abs))
+        local m = abs / (10 ^ e)
+        return sign .. string.format("%.2fe%d", m, e)
+    elseif abs >= 1e9 then return sign .. string.format("%.2fB", abs / 1e9)
+    elseif abs >= 1e6 then return sign .. string.format("%.2fM", abs / 1e6)
+    elseif abs >= 1e3 then return sign .. string.format("%.1fK", abs / 1e3)
+    else return tostring(math.floor(n))
+    end
+end
+
 function UI.roundRect(mode, x, y, w, h, r)
     love.graphics.rectangle(mode, x, y, w, h, r, r)
 end

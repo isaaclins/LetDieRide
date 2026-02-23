@@ -103,6 +103,29 @@ local function createItems()
                 end
             end,
         }),
+        Item:new({
+            name = "Limit Breaker",
+            description = "Raises all upgrade caps. Repeatable.",
+            icon = ">>",
+            cost = 500,
+            consumable = true,
+            trigger_type = "passive",
+            dynamic_cost = function(player)
+                return 500 * math.floor(2 ^ player.limit_break_count)
+            end,
+            condition = function(player)
+                if player.round >= 10 then return true end
+                for _, hand in ipairs(player.hands) do
+                    if hand.upgrade_level >= hand.max_upgrade then return true end
+                end
+                return false
+            end,
+            effect = function(self, context)
+                if context and context.player then
+                    context.player:applyLimitBreak()
+                end
+            end,
+        }),
     }
 end
 
