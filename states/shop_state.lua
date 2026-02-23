@@ -58,7 +58,7 @@ local function getColItemCount(col)
 end
 
 local function getExtraDieCost(player)
-	return math.floor((#player.dice_pool - 5 + 1) ^ 16)
+	return math.floor(((#player.dice_pool - 5 + 1) ^ 4) / 2)
 end
 
 local die_colors_map = {
