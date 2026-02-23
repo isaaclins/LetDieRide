@@ -30,66 +30,76 @@ end
 ]]
 
 local function parseVersion(v)
-    local major, minor, patch = v:match("(%d+)%.(%d+)%.(%d+)")
-    if major then
-        return tonumber(major), tonumber(minor), tonumber(patch)
-    end
-    return 0, 0, 0
+	local major, minor, patch = v:match("(%d+)%.(%d+)%.(%d+)")
+	if major then
+		return tonumber(major), tonumber(minor), tonumber(patch)
+	end
+	return 0, 0, 0
 end
 
 local function isNewer(remote, current)
-    local r1, r2, r3 = parseVersion(remote)
-    local c1, c2, c3 = parseVersion(current)
-    if r1 ~= c1 then return r1 > c1 end
-    if r2 ~= c2 then return r2 > c2 end
-    return r3 > c3
+	local r1, r2, r3 = parseVersion(remote)
+	local c1, c2, c3 = parseVersion(current)
+	if r1 ~= c1 then
+		return r1 > c1
+	end
+	if r2 ~= c2 then
+		return r2 > c2
+	end
+	return r3 > c3
 end
 
 function Updater.check()
-    if checked then return end
-    channel = love.thread.getChannel("update_check")
-    running_thread = love.thread.newThread(THREAD_CODE)
-    running_thread:start()
+	if checked then
+		return
+	end
+	channel = love.thread.getChannel("update_check")
+	running_thread = love.thread.newThread(THREAD_CODE)
+	running_thread:start()
 end
 
 function Updater.update()
-    if checked or not channel then return false end
-    local result = channel:pop()
-    if not result then return false end
+	if checked or not channel then
+		return false
+	end
+	local result = channel:pop()
+	if not result then
+		return false
+	end
 
-    checked = true
-    running_thread = nil
+	checked = true
+	running_thread = nil
 
-    local tag = result:match('"tag_name"%s*:%s*"([^"]*)"')
-    local url = result:match('"html_url"%s*:%s*"([^"]*)"')
+	local tag = result:match('"tag_name"%s*:%s*"([^"]*)"')
+	local url = result:match('"html_url"%s*:%s*"([^"]*)"')
 
-    if tag then
-        local version = tag:gsub("^v", "")
-        if isNewer(version, GAME_VERSION) then
-            update_available = true
-            latest_version = version
-            download_url = url or RELEASES_URL
-            return true
-        end
-    end
+	if tag then
+		local version = tag:gsub("^v", "")
+		if isNewer(version, GAME_VERSION) then
+			update_available = true
+			latest_version = version
+			download_url = url or RELEASES_URL
+			return true
+		end
+	end
 
-    return false
+	return false
 end
 
 function Updater.isUpdateAvailable()
-    return update_available
+	return update_available
 end
 
 function Updater.getLatestVersion()
-    return latest_version
+	return latest_version
 end
 
 function Updater.getVersion()
-    return GAME_VERSION
+	return GAME_VERSION
 end
 
 function Updater.openDownloadPage()
-    love.system.openURL(download_url or RELEASES_URL)
+	love.system.openURL(download_url or RELEASES_URL)
 end
 
 return Updater

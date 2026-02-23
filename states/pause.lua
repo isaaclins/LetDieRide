@@ -12,123 +12,155 @@ local pause_focus = 1
 local pause_actions = { "resume", "settings", "save_and_menu", "save_and_exit" }
 
 local function initAnims()
-    panel_anim = { scale = 0.8, alpha = 0 }
-    Tween.to(panel_anim, 0.3, { scale = 1.0, alpha = 1 }, "outBack")
+	panel_anim = { scale = 0.8, alpha = 0 }
+	Tween.to(panel_anim, 0.3, { scale = 1.0, alpha = 1 }, "outBack")
 
-    btn_anims = {}
-    for i = 1, 4 do
-        btn_anims[i] = { alpha = 0, y_off = 15 }
-        Tween.to(btn_anims[i], 0.3, { alpha = 1, y_off = 0 }, "outCubic")
-    end
-    pause_focus = 1
-    anim_init = true
+	btn_anims = {}
+	for i = 1, 4 do
+		btn_anims[i] = { alpha = 0, y_off = 15 }
+		Tween.to(btn_anims[i], 0.3, { alpha = 1, y_off = 0 }, "outCubic")
+	end
+	pause_focus = 1
+	anim_init = true
 end
 
 function Pause:draw()
-    if not anim_init then initAnims() end
+	if not anim_init then
+		initAnims()
+	end
 
-    local W, H = love.graphics.getDimensions()
+	local W, H = love.graphics.getDimensions()
 
-    love.graphics.setColor(0, 0, 0, 0.55 * panel_anim.alpha)
-    love.graphics.rectangle("fill", 0, 0, W, H)
+	love.graphics.setColor(0, 0, 0, 0.55 * panel_anim.alpha)
+	love.graphics.rectangle("fill", 0, 0, W, H)
 
-    local panel_w, panel_h = 320, 370
-    local px = (W - panel_w) / 2
-    local py = (H - panel_h) / 2
+	local panel_w, panel_h = 320, 370
+	local px = (W - panel_w) / 2
+	local py = (H - panel_h) / 2
 
-    love.graphics.push()
-    love.graphics.translate(px + panel_w / 2, py + panel_h / 2)
-    love.graphics.scale(panel_anim.scale, panel_anim.scale)
-    love.graphics.translate(-(px + panel_w / 2), -(py + panel_h / 2))
+	love.graphics.push()
+	love.graphics.translate(px + panel_w / 2, py + panel_h / 2)
+	love.graphics.scale(panel_anim.scale, panel_anim.scale)
+	love.graphics.translate(-(px + panel_w / 2), -(py + panel_h / 2))
 
-    UI.drawPanel(px, py, panel_w, panel_h, { border = UI.colors.accent, border_width = 2 })
+	UI.drawPanel(px, py, panel_w, panel_h, { border = UI.colors.accent, border_width = 2 })
 
-    love.graphics.setFont(Fonts.get(36))
-    UI.setColor(UI.colors.accent)
-    love.graphics.printf("PAUSED", px, py + 24, panel_w, "center")
+	love.graphics.setFont(Fonts.get(36))
+	UI.setColor(UI.colors.accent)
+	love.graphics.printf("PAUSED", px, py + 24, panel_w, "center")
 
-    local btn_w, btn_h = 220, 48
-    local btn_x = px + (panel_w - btn_w) / 2
-    local btn_y = py + 84
+	local btn_w, btn_h = 220, 48
+	local btn_x = px + (panel_w - btn_w) / 2
+	local btn_y = py + 84
 
-    local ba1 = btn_anims[1] or { alpha = 1, y_off = 0 }
-    self._resume_hovered = UI.drawButton(
-        "RESUME", btn_x, btn_y + ba1.y_off, btn_w, btn_h,
-        { font = Fonts.get(22), color = UI.colors.green, hover_color = UI.colors.green_light }
-    )
-    if pause_focus == 1 then UI.drawFocusRect(btn_x, btn_y + ba1.y_off, btn_w, btn_h) end
+	local ba1 = btn_anims[1] or { alpha = 1, y_off = 0 }
+	self._resume_hovered = UI.drawButton(
+		"RESUME",
+		btn_x,
+		btn_y + ba1.y_off,
+		btn_w,
+		btn_h,
+		{ font = Fonts.get(22), color = UI.colors.green, hover_color = UI.colors.green_light }
+	)
+	if pause_focus == 1 then
+		UI.drawFocusRect(btn_x, btn_y + ba1.y_off, btn_w, btn_h)
+	end
 
-    local ba2 = btn_anims[2] or { alpha = 1, y_off = 0 }
-    self._settings_hovered = UI.drawButton(
-        "SETTINGS", btn_x, btn_y + 60 + ba2.y_off, btn_w, btn_h,
-        { font = Fonts.get(22), color = UI.colors.panel_light, hover_color = UI.colors.panel_hover }
-    )
-    if pause_focus == 2 then UI.drawFocusRect(btn_x, btn_y + 60 + ba2.y_off, btn_w, btn_h) end
+	local ba2 = btn_anims[2] or { alpha = 1, y_off = 0 }
+	self._settings_hovered = UI.drawButton(
+		"SETTINGS",
+		btn_x,
+		btn_y + 60 + ba2.y_off,
+		btn_w,
+		btn_h,
+		{ font = Fonts.get(22), color = UI.colors.panel_light, hover_color = UI.colors.panel_hover }
+	)
+	if pause_focus == 2 then
+		UI.drawFocusRect(btn_x, btn_y + 60 + ba2.y_off, btn_w, btn_h)
+	end
 
-    local ba3 = btn_anims[3] or { alpha = 1, y_off = 0 }
-    self._menu_hovered = UI.drawButton(
-        "SAVE & MENU", btn_x, btn_y + 120 + ba3.y_off, btn_w, btn_h,
-        { font = Fonts.get(22), color = UI.colors.blue }
-    )
-    if pause_focus == 3 then UI.drawFocusRect(btn_x, btn_y + 120 + ba3.y_off, btn_w, btn_h) end
+	local ba3 = btn_anims[3] or { alpha = 1, y_off = 0 }
+	self._menu_hovered = UI.drawButton(
+		"SAVE & MENU",
+		btn_x,
+		btn_y + 120 + ba3.y_off,
+		btn_w,
+		btn_h,
+		{ font = Fonts.get(22), color = UI.colors.blue }
+	)
+	if pause_focus == 3 then
+		UI.drawFocusRect(btn_x, btn_y + 120 + ba3.y_off, btn_w, btn_h)
+	end
 
-    local ba4 = btn_anims[4] or { alpha = 1, y_off = 0 }
-    self._exit_hovered = UI.drawButton(
-        "SAVE & EXIT", btn_x, btn_y + 180 + ba4.y_off, btn_w, btn_h,
-        { font = Fonts.get(22), color = UI.colors.red, hover_color = { 0.95, 0.30, 0.30, 1 } }
-    )
-    if pause_focus == 4 then UI.drawFocusRect(btn_x, btn_y + 180 + ba4.y_off, btn_w, btn_h) end
+	local ba4 = btn_anims[4] or { alpha = 1, y_off = 0 }
+	self._exit_hovered = UI.drawButton(
+		"SAVE & EXIT",
+		btn_x,
+		btn_y + 180 + ba4.y_off,
+		btn_w,
+		btn_h,
+		{ font = Fonts.get(22), color = UI.colors.red, hover_color = { 0.95, 0.30, 0.30, 1 } }
+	)
+	if pause_focus == 4 then
+		UI.drawFocusRect(btn_x, btn_y + 180 + ba4.y_off, btn_w, btn_h)
+	end
 
-    love.graphics.setFont(Fonts.get(13))
-    UI.setColor(UI.colors.text_dark)
-    love.graphics.printf("Press Escape to resume", px, py + panel_h - 44, panel_w, "center")
+	love.graphics.setFont(Fonts.get(13))
+	UI.setColor(UI.colors.text_dark)
+	love.graphics.printf("Press Escape to resume", px, py + panel_h - 44, panel_w, "center")
 
-    local seed = RNG.getSeed()
-    if #seed > 0 then
-        UI.setColor(UI.colors.text_dim)
-        love.graphics.printf("Seed: " .. seed, px, py + panel_h - 24, panel_w, "center")
-    end
+	local seed = RNG.getSeed()
+	if #seed > 0 then
+		UI.setColor(UI.colors.text_dim)
+		love.graphics.printf("Seed: " .. seed, px, py + panel_h - 24, panel_w, "center")
+	end
 
-    love.graphics.pop()
+	love.graphics.pop()
 end
 
 function Pause:mousepressed(x, y, button)
-    if button ~= 1 then return nil end
+	if button ~= 1 then
+		return nil
+	end
 
-    if self._resume_hovered then
-        anim_init = false
-        return "resume"
-    elseif self._settings_hovered then
-        return "settings"
-    elseif self._menu_hovered then
-        anim_init = false
-        return "save_and_menu"
-    elseif self._exit_hovered then
-        anim_init = false
-        return "save_and_exit"
-    end
-    return nil
+	if self._resume_hovered then
+		anim_init = false
+		return "resume"
+	elseif self._settings_hovered then
+		return "settings"
+	elseif self._menu_hovered then
+		anim_init = false
+		return "save_and_menu"
+	elseif self._exit_hovered then
+		anim_init = false
+		return "save_and_exit"
+	end
+	return nil
 end
 
 function Pause:keypressed(key)
-    if key == "up" then
-        pause_focus = pause_focus - 1
-        if pause_focus < 1 then pause_focus = 4 end
-        return nil
-    elseif key == "down" then
-        pause_focus = pause_focus + 1
-        if pause_focus > 4 then pause_focus = 1 end
-        return nil
-    elseif key == "return" or key == "space" then
-        if pause_focus == 1 or pause_focus == 3 or pause_focus == 4 then
-            anim_init = false
-        end
-        return pause_actions[pause_focus]
-    elseif key == "escape" then
-        anim_init = false
-        return "resume"
-    end
-    return nil
+	if key == "up" then
+		pause_focus = pause_focus - 1
+		if pause_focus < 1 then
+			pause_focus = 4
+		end
+		return nil
+	elseif key == "down" then
+		pause_focus = pause_focus + 1
+		if pause_focus > 4 then
+			pause_focus = 1
+		end
+		return nil
+	elseif key == "return" or key == "space" then
+		if pause_focus == 1 or pause_focus == 3 or pause_focus == 4 then
+			anim_init = false
+		end
+		return pause_actions[pause_focus]
+	elseif key == "escape" then
+		anim_init = false
+		return "resume"
+	end
+	return nil
 end
 
 return Pause

@@ -14,199 +14,229 @@ local start_glow = 0
 local text_selected = false
 
 function SeedInput:init()
-    input_text = ""
-    cursor_blink = 0
-    input_pop = { scale = 1 }
-    start_glow = 0
-    text_selected = false
-    love.keyboard.setKeyRepeat(true)
+	input_text = ""
+	cursor_blink = 0
+	input_pop = { scale = 1 }
+	start_glow = 0
+	text_selected = false
+	love.keyboard.setKeyRepeat(true)
 
-    title_anim = { alpha = 0, y_off = -20 }
-    Tween.to(title_anim, 0.5, { alpha = 1, y_off = 0 }, "outCubic")
+	title_anim = { alpha = 0, y_off = -20 }
+	Tween.to(title_anim, 0.5, { alpha = 1, y_off = 0 }, "outCubic")
 end
 
 function SeedInput:cleanup()
-    love.keyboard.setKeyRepeat(false)
+	love.keyboard.setKeyRepeat(false)
 end
 
 function SeedInput:update(dt)
-    cursor_blink = cursor_blink + dt
-    input_pop.scale = input_pop.scale + (1.0 - input_pop.scale) * math.min(1, 10 * dt)
+	cursor_blink = cursor_blink + dt
+	input_pop.scale = input_pop.scale + (1.0 - input_pop.scale) * math.min(1, 10 * dt)
 
-    if #input_text > 0 then
-        start_glow = math.min(1, start_glow + dt * 3)
-    else
-        start_glow = math.max(0, start_glow - dt * 3)
-    end
+	if #input_text > 0 then
+		start_glow = math.min(1, start_glow + dt * 3)
+	else
+		start_glow = math.max(0, start_glow - dt * 3)
+	end
 end
 
 function SeedInput:draw()
-    local W, H = love.graphics.getDimensions()
+	local W, H = love.graphics.getDimensions()
 
-    UI.setColor(UI.colors.bg)
-    love.graphics.rectangle("fill", 0, 0, W, H)
+	UI.setColor(UI.colors.bg)
+	love.graphics.rectangle("fill", 0, 0, W, H)
 
-    love.graphics.setFont(Fonts.get(36))
-    love.graphics.setColor(UI.colors.accent[1], UI.colors.accent[2], UI.colors.accent[3], title_anim.alpha)
-    love.graphics.printf("ENTER SEED", 0, H * 0.18 + title_anim.y_off, W, "center")
+	love.graphics.setFont(Fonts.get(36))
+	love.graphics.setColor(UI.colors.accent[1], UI.colors.accent[2], UI.colors.accent[3], title_anim.alpha)
+	love.graphics.printf("ENTER SEED", 0, H * 0.18 + title_anim.y_off, W, "center")
 
-    love.graphics.setFont(Fonts.get(16))
-    love.graphics.setColor(UI.colors.text_dim[1], UI.colors.text_dim[2], UI.colors.text_dim[3], title_anim.alpha)
-    love.graphics.printf("Same seed = same run. Share seeds with friends!", 0, H * 0.18 + 50 + title_anim.y_off, W, "center")
+	love.graphics.setFont(Fonts.get(16))
+	love.graphics.setColor(UI.colors.text_dim[1], UI.colors.text_dim[2], UI.colors.text_dim[3], title_anim.alpha)
+	love.graphics.printf(
+		"Same seed = same run. Share seeds with friends!",
+		0,
+		H * 0.18 + 50 + title_anim.y_off,
+		W,
+		"center"
+	)
 
-    local box_w, box_h = 400, 52
-    local box_x = (W - box_w) / 2
-    local box_y = H * 0.40
+	local box_w, box_h = 400, 52
+	local box_x = (W - box_w) / 2
+	local box_y = H * 0.40
 
-    love.graphics.push()
-    local bx_cx = box_x + box_w / 2
-    local bx_cy = box_y + box_h / 2
-    love.graphics.translate(bx_cx, bx_cy)
-    love.graphics.scale(input_pop.scale, input_pop.scale)
-    love.graphics.translate(-bx_cx, -bx_cy)
+	love.graphics.push()
+	local bx_cx = box_x + box_w / 2
+	local bx_cy = box_y + box_h / 2
+	love.graphics.translate(bx_cx, bx_cy)
+	love.graphics.scale(input_pop.scale, input_pop.scale)
+	love.graphics.translate(-bx_cx, -bx_cy)
 
-    UI.drawPanel(box_x, box_y, box_w, box_h, { border = UI.colors.accent, border_width = 2 })
+	UI.drawPanel(box_x, box_y, box_w, box_h, { border = UI.colors.accent, border_width = 2 })
 
-    if #input_text > 0 then
-        love.graphics.setFont(Fonts.get(24))
-        local font = Fonts.get(24)
-        local text_w = font:getWidth(input_text)
-        local text_y = box_y + (box_h - font:getHeight()) / 2
+	if #input_text > 0 then
+		love.graphics.setFont(Fonts.get(24))
+		local font = Fonts.get(24)
+		local text_w = font:getWidth(input_text)
+		local text_y = box_y + (box_h - font:getHeight()) / 2
 
-        if text_selected then
-            love.graphics.setColor(0.25, 0.45, 0.85, 0.45)
-            UI.roundRect("fill", box_x + 14, text_y - 2, text_w + 4, font:getHeight() + 4, 3)
-        end
+		if text_selected then
+			love.graphics.setColor(0.25, 0.45, 0.85, 0.45)
+			UI.roundRect("fill", box_x + 14, text_y - 2, text_w + 4, font:getHeight() + 4, 3)
+		end
 
-        UI.setColor(UI.colors.text)
-        love.graphics.printf(input_text, box_x + 16, text_y, box_w - 32, "left")
+		UI.setColor(UI.colors.text)
+		love.graphics.printf(input_text, box_x + 16, text_y, box_w - 32, "left")
 
-        if not text_selected then
-            local cursor_alpha = 0.5 + 0.5 * math.sin(cursor_blink * math.pi * 2)
-            love.graphics.setColor(1, 1, 1, cursor_alpha)
-            love.graphics.rectangle("fill", box_x + 16 + text_w, box_y + 10, 2, box_h - 20)
-        end
-    else
-        love.graphics.setFont(Fonts.get(16))
-        UI.setColor(UI.colors.text_dark)
-        love.graphics.printf(placeholder, box_x + 16, box_y + (box_h - Fonts.get(16):getHeight()) / 2, box_w - 32, "center")
-    end
+		if not text_selected then
+			local cursor_alpha = 0.5 + 0.5 * math.sin(cursor_blink * math.pi * 2)
+			love.graphics.setColor(1, 1, 1, cursor_alpha)
+			love.graphics.rectangle("fill", box_x + 16 + text_w, box_y + 10, 2, box_h - 20)
+		end
+	else
+		love.graphics.setFont(Fonts.get(16))
+		UI.setColor(UI.colors.text_dark)
+		love.graphics.printf(
+			placeholder,
+			box_x + 16,
+			box_y + (box_h - Fonts.get(16):getHeight()) / 2,
+			box_w - 32,
+			"center"
+		)
+	end
 
-    love.graphics.pop()
+	love.graphics.pop()
 
-    local btn_w, btn_h = 260, 52
-    local btn_x = (W - btn_w) / 2
-    local btn_y = H * 0.55
+	local btn_w, btn_h = 260, 52
+	local btn_x = (W - btn_w) / 2
+	local btn_y = H * 0.55
 
-    if start_glow > 0.1 then
-        local glow_a = 0.1 + 0.08 * math.sin(love.timer.getTime() * 3)
-        love.graphics.setColor(UI.colors.green[1], UI.colors.green[2], UI.colors.green[3], glow_a * start_glow)
-        UI.roundRect("fill", btn_x - 4, btn_y - 4, btn_w + 8, btn_h + 8, 12)
-    end
+	if start_glow > 0.1 then
+		local glow_a = 0.1 + 0.08 * math.sin(love.timer.getTime() * 3)
+		love.graphics.setColor(UI.colors.green[1], UI.colors.green[2], UI.colors.green[3], glow_a * start_glow)
+		UI.roundRect("fill", btn_x - 4, btn_y - 4, btn_w + 8, btn_h + 8, 12)
+	end
 
-    local start_label = #input_text > 0 and "START" or "START (RANDOM SEED)"
-    self._start_hovered = UI.drawButton(
-        start_label, btn_x, btn_y, btn_w, btn_h,
-        { font = Fonts.get(20), color = UI.colors.green, hover_color = UI.colors.green_light }
-    )
+	local start_label = #input_text > 0 and "START" or "START (RANDOM SEED)"
+	self._start_hovered = UI.drawButton(
+		start_label,
+		btn_x,
+		btn_y,
+		btn_w,
+		btn_h,
+		{ font = Fonts.get(20), color = UI.colors.green, hover_color = UI.colors.green_light }
+	)
 
-    local paste_btn_w = 80
-    local paste_gap = 10
-    self._paste_hovered = UI.drawButton(
-        "PASTE", btn_x + btn_w + paste_gap, btn_y, paste_btn_w, btn_h,
-        { font = Fonts.get(16), color = UI.colors.panel_light, hover_color = UI.colors.panel_hover }
-    )
+	local paste_btn_w = 80
+	local paste_gap = 10
+	self._paste_hovered = UI.drawButton(
+		"PASTE",
+		btn_x + btn_w + paste_gap,
+		btn_y,
+		paste_btn_w,
+		btn_h,
+		{ font = Fonts.get(16), color = UI.colors.panel_light, hover_color = UI.colors.panel_hover }
+	)
 
-    self._back_hovered = UI.drawButton(
-        "BACK", btn_x, btn_y + 66, btn_w, btn_h,
-        { font = Fonts.get(20), color = UI.colors.red, hover_color = { 0.95, 0.30, 0.30, 1 } }
-    )
+	self._back_hovered = UI.drawButton(
+		"BACK",
+		btn_x,
+		btn_y + 66,
+		btn_w,
+		btn_h,
+		{ font = Fonts.get(20), color = UI.colors.red, hover_color = { 0.95, 0.30, 0.30, 1 } }
+	)
 
-    love.graphics.setFont(Fonts.get(13))
-    UI.setColor(UI.colors.text_dark)
-    love.graphics.printf("Alphanumeric characters only (A-Z, 0-9)", 0, H * 0.40 + 60, W, "center")
+	love.graphics.setFont(Fonts.get(13))
+	UI.setColor(UI.colors.text_dark)
+	love.graphics.printf("Alphanumeric characters only (A-Z, 0-9)", 0, H * 0.40 + 60, W, "center")
 end
 
 function SeedInput:getSeed()
-    if #input_text > 0 then
-        return input_text:upper()
-    else
-        return RNG.generateSeed()
-    end
+	if #input_text > 0 then
+		return input_text:upper()
+	else
+		return RNG.generateSeed()
+	end
 end
 
 local function pasteClipboard()
-    local clip = love.system.getClipboardText() or ""
-    local filtered = clip:upper():gsub("[^A-Z0-9]", "")
-    if #filtered > 0 then
-        input_text = filtered:sub(1, 16)
-        input_pop.scale = 1.06
-    end
+	local clip = love.system.getClipboardText() or ""
+	local filtered = clip:upper():gsub("[^A-Z0-9]", "")
+	if #filtered > 0 then
+		input_text = filtered:sub(1, 16)
+		input_pop.scale = 1.06
+	end
 end
 
 function SeedInput:mousepressed(x, y, button)
-    if button ~= 1 then return nil end
-    text_selected = false
-    if self._start_hovered then
-        self:cleanup()
-        return "confirm_seed"
-    elseif self._paste_hovered then
-        pasteClipboard()
-        return nil
-    elseif self._back_hovered then
-        self:cleanup()
-        return "back_to_menu"
-    end
-    return nil
+	if button ~= 1 then
+		return nil
+	end
+	text_selected = false
+	if self._start_hovered then
+		self:cleanup()
+		return "confirm_seed"
+	elseif self._paste_hovered then
+		pasteClipboard()
+		return nil
+	elseif self._back_hovered then
+		self:cleanup()
+		return "back_to_menu"
+	end
+	return nil
 end
 
 function SeedInput:keypressed(key)
-    local ctrl = love.keyboard.isDown("lgui") or love.keyboard.isDown("rgui")
-        or love.keyboard.isDown("lctrl") or love.keyboard.isDown("rctrl")
+	local ctrl = love.keyboard.isDown("lgui")
+		or love.keyboard.isDown("rgui")
+		or love.keyboard.isDown("lctrl")
+		or love.keyboard.isDown("rctrl")
 
-    if key == "return" then
-        text_selected = false
-        self:cleanup()
-        return "confirm_seed"
-    elseif key == "escape" then
-        text_selected = false
-        self:cleanup()
-        return "back_to_menu"
-    elseif key == "backspace" then
-        if text_selected or ctrl then
-            input_text = ""
-            text_selected = false
-        else
-            input_text = input_text:sub(1, -2)
-        end
-    elseif key == "v" and ctrl then
-        text_selected = false
-        pasteClipboard()
-    elseif key == "a" and ctrl then
-        if #input_text > 0 then
-            text_selected = true
-        end
-    elseif key == "c" and ctrl then
-        if #input_text > 0 then
-            love.system.setClipboardText(input_text:upper())
-        end
-    end
-    return nil
+	if key == "return" then
+		text_selected = false
+		self:cleanup()
+		return "confirm_seed"
+	elseif key == "escape" then
+		text_selected = false
+		self:cleanup()
+		return "back_to_menu"
+	elseif key == "backspace" then
+		if text_selected or ctrl then
+			input_text = ""
+			text_selected = false
+		else
+			input_text = input_text:sub(1, -2)
+		end
+	elseif key == "v" and ctrl then
+		text_selected = false
+		pasteClipboard()
+	elseif key == "a" and ctrl then
+		if #input_text > 0 then
+			text_selected = true
+		end
+	elseif key == "c" and ctrl then
+		if #input_text > 0 then
+			love.system.setClipboardText(input_text:upper())
+		end
+	end
+	return nil
 end
 
 function SeedInput:textinput(text)
-    local filtered = text:upper():gsub("[^A-Z0-9]", "")
-    if #filtered == 0 then return end
+	local filtered = text:upper():gsub("[^A-Z0-9]", "")
+	if #filtered == 0 then
+		return
+	end
 
-    if text_selected then
-        input_text = ""
-        text_selected = false
-    end
+	if text_selected then
+		input_text = ""
+		text_selected = false
+	end
 
-    if #input_text + #filtered <= 16 then
-        input_text = input_text .. filtered
-        input_pop.scale = 1.06
-    end
+	if #input_text + #filtered <= 16 then
+		input_text = input_text .. filtered
+		input_pop.scale = 1.06
+	end
 end
 
 return SeedInput
