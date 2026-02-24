@@ -30,9 +30,21 @@ function Hand:calculateScore(dice_values, matched_dice)
 	return math.floor(score)
 end
 
+function Hand:getXOfAKindBase(x)
+	local count = math.max(3, x or 3)
+	local extra = count - 3
+	return math.floor(22 + extra * 16) + self._upgrade_base_bonus
+end
+
+function Hand:getXOfAKindMult(x)
+	local count = math.max(3, x or 3)
+	local extra = count - 3
+	return (1.8 + extra * 0.22) + self._upgrade_mult_bonus
+end
+
 function Hand:calculateXOfAKindScore(x, matched_dice)
-	local base = math.floor(5 * x * (x - 1)) + self._upgrade_base_bonus
-	local mult = (x - 1) + self._upgrade_mult_bonus
+	local base = self:getXOfAKindBase(x)
+	local mult = self:getXOfAKindMult(x)
 	local sum = 0
 	for _, v in ipairs(matched_dice) do
 		sum = sum + v
@@ -47,11 +59,11 @@ function Hand:upgrade()
 	self.upgrade_level = self.upgrade_level + 1
 	if self.is_x_of_a_kind then
 		local current_base = self._original_base + self._upgrade_base_bonus
-		local increment = math.floor(current_base * 0.3)
+		local increment = math.max(1, math.floor(current_base * 0.2))
 		self._upgrade_base_bonus = self._upgrade_base_bonus + increment
-		self._upgrade_mult_bonus = self._upgrade_mult_bonus + 0.5
-		self.base_score = self._original_base + self._upgrade_base_bonus
-		self.multiplier = self._original_mult + self._upgrade_mult_bonus
+		self._upgrade_mult_bonus = self._upgrade_mult_bonus + 0.25
+		self.base_score = self:getXOfAKindBase(3)
+		self.multiplier = self:getXOfAKindMult(3)
 	else
 		self.base_score = self.base_score + math.floor(self.base_score * 0.3)
 		self.multiplier = self.multiplier + 0.5
@@ -70,8 +82,8 @@ end
 function Hand:getDisplayScore()
 	local UI = require("functions/ui")
 	if self.is_x_of_a_kind then
-		local base3 = math.floor(5 * 3 * 2) + self._upgrade_base_bonus
-		local mult3 = 2 + self._upgrade_mult_bonus
+		local base3 = self:getXOfAKindBase(3)
+		local mult3 = self:getXOfAKindMult(3)
 		local mult_str = mult3 >= 1e3 and UI.abbreviate(mult3) or string.format("%.1f", mult3)
 		return UI.abbreviate(base3) .. " x " .. mult_str .. "+"
 	end

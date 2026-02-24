@@ -38,6 +38,7 @@ The total is the sum of all hand scores, then dice abilities and item effects ar
 total = sum of all hand_scores
 total = total + ability_bonuses
 total = floor( total x (1 + item_mult_bonus) )
+total = floor( total x score_mult )
 ```
 
 ### Example
@@ -57,7 +58,9 @@ final_score = floor(162 x (1 + 1.0)) = 324
 
 ## Optimal Combination Algorithm
 
-`Scoring.findOptimalCombination(values, hands_list)` uses **memoized backtracking** to find the best partition:
+`Scoring.findOptimalCombination(values, hands_list)` uses:
+- **Memoized backtracking** for 12 dice or fewer
+- **Greedy extraction** for more than 12 dice
 
 1. Represent the dice pool as a frequency table: `{[1]=count1, [2]=count2, ..., [6]=count6}`
 2. Generate all possible hand extractions from the current pool
@@ -65,13 +68,13 @@ final_score = floor(162 x (1 + 1.0)) = 324
 4. Return the partition with the highest total score
 5. Memoize results keyed on the counts tuple for efficiency
 
-With max ~14 dice and values 1-6, the memoized state space is small and runs in well under 1ms.
+For large pools (>12 dice), the greedy path favors the current highest immediate-scoring extraction.
 
 ### Hand Extraction Rules
 
 | Hand | Extraction |
 |------|-----------|
-| **X of a Kind** | For each value with count >= x (x=3..count), extract x dice of that value |
+| **X of a Kind** | For each value with count >= 3, extract either 3 dice or all dice of that value |
 | **Pair** | Extract 2 dice of any value with count >= 2 |
 | **Two Pair** | Extract 2+2 from two different values |
 | **Full House** | Extract 3 of one value + 2 of another |
@@ -86,6 +89,8 @@ With max ~14 dice and values 1-6, the memoized state space is small and runs in 
 
 Unmatched dice (not part of any hand) don't score. If no hand can be formed at all, falls back to **High Roll** (highest single die).
 
+Note: **Full House** is scored as `X-of-a-Kind(3) + Pair + FullHouse base bonus` in extraction logic.
+
 ---
 
 ## X of a Kind (Dynamic Scaling)
@@ -95,20 +100,20 @@ Instead of separate Three/Four/Five/Six/Seven of a Kind hands, there is a single
 ### Scaling Formula
 
 ```
-base_score(x) = floor(5 * x * (x - 1))
-multiplier(x) = x - 1
+base_score(x) = floor(22 + 16 * (x - 3))
+multiplier(x) = 1.8 + 0.22 * (x - 3)
 ```
 
 | X | Base Score | Multiplier |
 |---|-----------|-----------|
-| 3 | 30 | 2.0 |
-| 4 | 60 | 3.0 |
-| 5 | 100 | 4.0 |
-| 6 | 150 | 5.0 |
-| 7 | 210 | 6.0 |
-| 8 | 280 | 7.0 |
-| 9 | 360 | 8.0 |
-| 10 | 450 | 9.0 |
+| 3 | 22 | 1.8 |
+| 4 | 38 | 2.02 |
+| 5 | 54 | 2.24 |
+| 6 | 70 | 2.46 |
+| 7 | 86 | 2.68 |
+| 8 | 102 | 2.90 |
+| 9 | 118 | 3.12 |
+| 10 | 134 | 3.34 |
 
 The formula extends naturally to any number of matching dice. Upgrades apply a flat base bonus and flat mult bonus on top of the X-scaling formula.
 
@@ -125,7 +130,9 @@ Each hand can be upgraded up to **level 5** in the shop.
 | Base score | +30% (compounding): `base = floor(base x 1.3)` |
 | Multiplier | +0.5 flat |
 
-For X of a Kind, upgrades add flat bonuses to the scaling formula (starting from the 3-of-a-kind base of 30).
+For X of a Kind, upgrades add flatter bonuses to the scaling formula:
+- Base bonus: +20% (compounding on upgrade bonus state)
+- Mult bonus: +0.25 flat per level
 
 ### Upgrade Cost Formula
 
@@ -151,17 +158,17 @@ All 13 hands at level 0:
 | # | Hand | Base | Mult | Min Dice | Description |
 |---|------|------|------|----------|-------------|
 | 13 | Pyramid | 200 | x10 | 9 | 1x two, 3x fours, 5x sixes |
-| 12 | Full Run | 80 | x4.5 | 6 | All values 1-6 present |
-| 11 | Two Triplets | 65 | x4 | 6 | Two sets of three of a kind |
-| 10 | Three Pairs | 50 | x3 | 6 | Three different pairs |
-| 9 | Large Straight | 45 | x3 | 5 | Five consecutive values |
-| 8 | All Even | 40 | x3 | 5 | Every die shows 2/4/6 |
-| 7 | All Odd | 40 | x3 | 5 | Every die shows 1/3/5 |
-| 6 | Full House | 40 | x2.5 | 5 | Three of a kind + a pair |
-| 5 | Small Straight | 30 | x2.5 | 4 | Four consecutive values |
-| 4 | X of a Kind | 30-450+ | x2-9+ | 3 | 3+ matching dice, scales with count |
-| 3 | Two Pair | 20 | x1.5 | 4 | Two different pairs |
-| 2 | Pair | 10 | x1.5 | 2 | Two dice of the same value |
+| 12 | Full Run | 110 | x5.2 | 6 | All values 1-6 present |
+| 11 | Two Triplets | 88 | x4.4 | 6 | Two sets of three of a kind |
+| 10 | Three Pairs | 70 | x3.6 | 6 | Three different pairs |
+| 9 | Large Straight | 58 | x3.4 | 5 | Five consecutive values |
+| 8 | All Even | 52 | x2.8 | 5 | Every die shows 2/4/6 |
+| 7 | All Odd | 52 | x2.8 | 5 | Every die shows 1/3/5 |
+| 6 | Full House | 60 | x3.0 | 5 | Three of a kind + a pair |
+| 5 | Small Straight | 34 | x2.6 | 4 | Four consecutive values |
+| 4 | X of a Kind | 22-134+ | x1.8-3.34+ | 3 | 3+ matching dice, scales with count |
+| 3 | Two Pair | 24 | x1.8 | 4 | Two different pairs |
+| 2 | Pair | 12 | x1.6 | 2 | Two dice of the same value |
 | 1 | High Roll | 5 | x1 | 1 | Highest single die (fallback) |
 
 ---

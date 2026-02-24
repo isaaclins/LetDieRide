@@ -38,6 +38,8 @@ local combo_filtered_indices = {}
 local combo_page = 1
 local combo_page_size = 8
 local combo_search_query = ""
+local dice_scroll_x = 0
+local dice_scroll_region = nil
 
 local _btn_regions = {}
 local active_input = nil
@@ -84,6 +86,8 @@ function DevMenu:open()
 	combo_filtered_indices = {}
 	combo_page = 1
 	combo_search_query = ""
+	dice_scroll_x = 0
+	dice_scroll_region = nil
 	_btn_regions = {}
 	active_input = nil
 	input_buffer = ""
@@ -99,6 +103,10 @@ end
 
 local function registerBtn(id, x, y, w, h)
 	_btn_regions[id] = { x = x, y = y, w = w, h = h }
+end
+
+local function clampDiceScroll(max_scroll)
+	dice_scroll_x = math.max(0, math.min(dice_scroll_x or 0, max_scroll or 0))
 end
 
 local function smallBtn(text, x, y, w, h, color, hover_color)
@@ -550,45 +558,81 @@ local function drawDiceTab(px, py, pw, ph)
 	local small_font = Fonts.get(12)
 	local die_size = 36
 	local btn_w, btn_h = 28, 28
+	local nav_btn_w = 26
+	local nav_gap = 8
+	local card_w = die_size + btn_w + 16
 
 	love.graphics.setFont(Fonts.get(13))
 	UI.setColor(UI.colors.text_dim)
 	love.graphics.print("Starting Dice (" .. #draft.dice_pool .. ")", px + pad, ly)
 	ly = ly + 20
 
-	local dice_per_row = math.floor((pw - pad * 2) / (die_size + btn_w + 12))
-	local col = 0
+	local viewport_x = px + pad + nav_btn_w + nav_gap
+	local viewport_w = math.max(120, pw - pad * 2 - (nav_btn_w + nav_gap) * 2)
+	local viewport_h = die_size + 22
+	local total_w = #draft.dice_pool * card_w
+	local max_scroll = math.max(0, total_w - viewport_w)
+	clampDiceScroll(max_scroll)
+	dice_scroll_region = { x = viewport_x, y = ly, w = viewport_w, h = viewport_h }
+
+	smallBtn("<", px + pad, ly + 4, nav_btn_w, btn_h, UI.colors.panel_light, UI.colors.panel_hover)
+	registerBtn("dice_scroll_left", px + pad, ly + 4, nav_btn_w, btn_h)
+	smallBtn(">", px + pw - pad - nav_btn_w, ly + 4, nav_btn_w, btn_h, UI.colors.panel_light, UI.colors.panel_hover)
+	registerBtn("dice_scroll_right", px + pw - pad - nav_btn_w, ly + 4, nav_btn_w, btn_h)
+
+	love.graphics.setScissor(viewport_x, ly, viewport_w, viewport_h)
 	for i, die in ipairs(draft.dice_pool) do
-		local dx = px + pad + col * (die_size + btn_w + 16)
-		local dot_color = UI.colors.die_black
-		if die.color == "blue" then
-			dot_color = UI.colors.die_blue
-		elseif die.color == "green" then
-			dot_color = UI.colors.die_green
-		elseif die.color == "red" then
-			dot_color = UI.colors.die_red
-		end
+		local dx = viewport_x - dice_scroll_x + (i - 1) * card_w
+		local right_x = dx + card_w
+		if right_x >= viewport_x and dx <= viewport_x + viewport_w then
+			local dot_color = UI.colors.die_black
+			if die.color == "blue" then
+				dot_color = UI.colors.die_blue
+			elseif die.color == "green" then
+				dot_color = UI.colors.die_green
+			elseif die.color == "red" then
+				dot_color = UI.colors.die_red
+			end
 
-		UI.drawDie(dx, ly, die_size, die.value, dot_color, nil, false, false, die.glow_color, false, die.items, nil, nil, nil, die.stickers)
+			UI.drawDie(
+				dx,
+				ly,
+				die_size,
+				die.value,
+				dot_color,
+				nil,
+				false,
+				false,
+				die.glow_color,
+				false,
+				die.items,
+				nil,
+				nil,
+				nil,
+				die.stickers
+			)
 
-		love.graphics.setFont(small_font)
-		UI.setColor(UI.colors.text_dim)
-		love.graphics.print(normalizeDiceLabel(die.name):sub(1, 10), dx, ly + die_size + 2)
+			love.graphics.setFont(small_font)
+			UI.setColor(UI.colors.text_dim)
+			love.graphics.print(normalizeDiceLabel(die.name):sub(1, 10), dx, ly + die_size + 2)
 
-		smallBtn("X", dx + die_size + 4, ly + 4, btn_w, btn_h, UI.colors.red, { 0.95, 0.30, 0.30, 1 })
-		registerBtn("dice_remove_" .. i, dx + die_size + 4, ly + 4, btn_w, btn_h)
-
-		col = col + 1
-		if col >= dice_per_row then
-			col = 0
-			ly = ly + die_size + 22
+			smallBtn("X", dx + die_size + 4, ly + 4, btn_w, btn_h, UI.colors.red, { 0.95, 0.30, 0.30, 1 })
+			registerBtn("dice_remove_" .. i, dx + die_size + 4, ly + 4, btn_w, btn_h)
 		end
 	end
-	if col > 0 then
-		ly = ly + die_size + 22
+	love.graphics.setScissor()
+
+	if max_scroll > 0 then
+		local track_y = ly + viewport_h + 3
+		local knob_w = math.max(24, math.floor(viewport_w * viewport_w / total_w))
+		local knob_x = viewport_x + math.floor((viewport_w - knob_w) * (dice_scroll_x / max_scroll))
+		love.graphics.setColor(UI.colors.text_dark[1], UI.colors.text_dark[2], UI.colors.text_dark[3], 0.4)
+		UI.roundRect("fill", viewport_x, track_y, viewport_w, 4, 2)
+		love.graphics.setColor(UI.colors.accent[1], UI.colors.accent[2], UI.colors.accent[3], 0.8)
+		UI.roundRect("fill", knob_x, track_y, knob_w, 4, 2)
 	end
 
-	ly = ly + 10
+	ly = ly + viewport_h + 12
 	love.graphics.setColor(UI.colors.text_dark[1], UI.colors.text_dark[2], UI.colors.text_dark[3], 0.5)
 	love.graphics.line(px + pad, ly, px + pw - pad, ly)
 	ly = ly + 10
@@ -601,7 +645,7 @@ local function drawDiceTab(px, py, pw, ph)
 	local add_btn_w = 100
 	local add_btn_h = 32
 	local cols = math.floor((pw - pad * 2 + 8) / (add_btn_w + 8))
-	col = 0
+	local col = 0
 	for idx, die in ipairs(all_dice_ref) do
 		local bx = px + pad + col * (add_btn_w + 8)
 		smallBtn(normalizeDiceLabel(die.name):sub(1, 12), bx, ly, add_btn_w, add_btn_h, UI.colors.blue, UI.colors.blue_hover)
@@ -1162,6 +1206,9 @@ function DevMenu:handleButton(id)
 	for _, tab_key in ipairs(tabs) do
 		if id == "tab_" .. tab_key then
 			current_tab = tab_key
+			if current_tab ~= "dice" then
+				dice_scroll_region = nil
+			end
 			if current_tab == "combos" then
 				refreshComboFilter()
 			end
@@ -1228,6 +1275,16 @@ function DevMenu:handleButton(id)
 			_btn_regions = {}
 			Toast.show("Removed " .. name, "error")
 		end
+		return nil
+	end
+
+	if id == "dice_scroll_left" then
+		dice_scroll_x = math.max(0, dice_scroll_x - (36 + 28 + 16))
+		return nil
+	end
+
+	if id == "dice_scroll_right" then
+		dice_scroll_x = dice_scroll_x + (36 + 28 + 16)
 		return nil
 	end
 
@@ -1529,6 +1586,19 @@ function DevMenu:keypressed(key)
 		current_tab = tabs[tab_idx + 1]
 		_btn_regions = {}
 	end
+	return nil
+end
+
+function DevMenu:wheelmoved(x, y)
+	if current_tab ~= "dice" or not dice_scroll_region then
+		return nil
+	end
+	local mx, my = love.mouse.getPosition()
+	if not UI.pointInRect(mx, my, dice_scroll_region.x, dice_scroll_region.y, dice_scroll_region.w, dice_scroll_region.h) then
+		return nil
+	end
+	local wheel_delta = (x ~= 0 and x or -y) * 40
+	dice_scroll_x = math.max(0, dice_scroll_x + wheel_delta)
 	return nil
 end
 
